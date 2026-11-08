@@ -113,9 +113,17 @@ Firewall, device policy, and logs stay empty on this picture. This agent cannot 
 
 Never collected: environment variables, SSH private keys, keychains, browser profiles, mail, documents, password-manager vaults, `/etc/shadow`, packet contents, kernel telemetry.
 
-## Pause and uninstall
+## Pause, deactivate, uninstall
 
-Pause is on the page (Looking / Paused). Pause stops collectors. Resume runs them.
+Three ways to stop, from lightest to fullest:
+
+| Action | What it does | How |
+| --- | --- | --- |
+| Pause | Collectors stop. Process and login item stay. | Looking / Paused on the page |
+| Deactivate | Program stops. Does not start at login. Store and skills stay. | Settings → Stop → Stop EDwaRd |
+| Uninstall | Removes program, store, login item, PATH link, and EDwaRd skill files | Settings → Stop → Remove everything, or `sh uninstall.sh` |
+
+Your agent has the same three options in its skill. Ask it to pause, deactivate, or uninstall EDwaRd and it should list them before acting.
 
 ```bash
 sh uninstall.sh

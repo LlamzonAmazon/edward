@@ -95,6 +95,38 @@ func (h *api) serveAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	case r.URL.Path == "/api/deactivate" && r.Method == http.MethodPost:
+		var body struct {
+			Confirm bool `json:"confirm"`
+		}
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+		if !body.Confirm {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+		if err := h.r.Deactivate(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	case r.URL.Path == "/api/uninstall" && r.Method == http.MethodPost:
+		var body struct {
+			Confirm bool `json:"confirm"`
+		}
+		if !decodeJSON(w, r, &body) {
+			return
+		}
+		if !body.Confirm {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+		if err := h.r.Uninstall(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	case strings.HasPrefix(r.URL.Path, "/api/findings/") && r.Method == http.MethodPost:
 		h.finding(w, r)
 	default:

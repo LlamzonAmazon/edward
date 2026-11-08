@@ -9,6 +9,8 @@ import {
   note as postNote,
   notes as postNotes,
   pause as postPause,
+  deactivate as postDeactivate,
+  uninstall as postUninstall,
   type FindingState,
   type Status,
   type Store,
@@ -263,6 +265,32 @@ export default function App() {
           onContext={(c) => {
             write(() => postNotes(c), (s) => ({ ...s, agentNotes: c }));
             setToast({ msg: `Saved for ${agentNames(agentIds)}.` });
+          }}
+          onDeactivate={() => {
+            if (!live.current) {
+              setToast({ msg: "Fixture only. Deactivate needs the live agent." });
+              return;
+            }
+            postDeactivate()
+              .then(() => {
+                live.current = false;
+                setSettingsOpen(false);
+                setToast({ msg: "EDwaRd stopped. Run install.sh to start again." });
+              })
+              .catch(() => setToast({ msg: "Could not stop EDwaRd." }));
+          }}
+          onUninstall={() => {
+            if (!live.current) {
+              setToast({ msg: "Fixture only. Remove everything needs the live agent." });
+              return;
+            }
+            postUninstall()
+              .then(() => {
+                live.current = false;
+                setSettingsOpen(false);
+                setToast({ msg: "EDwaRd removed from this Mac." });
+              })
+              .catch(() => setToast({ msg: "Could not remove EDwaRd." }));
           }}
           onClose={closeSettings}
         />

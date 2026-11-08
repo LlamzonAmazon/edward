@@ -15,8 +15,12 @@ type Props = {
   onContext: (c: string) => void;
   state: Record<string, FindingState>;
   onNote: (id: string, note: string | undefined) => void;
+  onDeactivate: () => void;
+  onUninstall: () => void;
   onClose: () => void;
 };
+
+type StopKind = "deactivate" | "uninstall" | null;
 
 const titles: Record<View, string> = {
   main: "Settings",
@@ -25,16 +29,21 @@ const titles: Record<View, string> = {
 };
 
 export function Settings(props: Props) {
-  const { open, agentIds, onAgents, context, state, onClose } = props;
+  const { open, agentIds, onAgents, context, state, onDeactivate, onUninstall, onClose } = props;
   const { findings } = useSurface();
   const [view, setView] = useState<View>("main");
   const [dir, setDir] = useState<"next" | "back">("next");
+  const [stop, setStop] = useState<StopKind>(null);
   useEffect(() => {
-    if (open) setView("main");
+    if (open) {
+      setView("main");
+      setStop(null);
+    }
   }, [open]);
   const go = (v: View) => {
     setDir(v === "main" ? "back" : "next");
     setView(v);
+    setStop(null);
   };
   const noted = findings.filter((f) => state[f.id]?.note);
   const firstLine = context.split("\n")[0];
@@ -81,6 +90,46 @@ export function Settings(props: Props) {
                 <span className="t-head">What EDwaRd can see</span>
                 <Device />
                 <AccessList />
+              </div>
+              <div className="section">
+                <span className="t-head">Stop</span>
+                <p className="muted">Pause is Looking / Paused at the bottom of the sidebar. It keeps the program running.</p>
+                {!stop && (
+                  <div className="picks">
+                    <Wipe tone="quiet" onClick={() => setStop("deactivate")}>
+                      Stop EDwaRd
+                    </Wipe>
+                    <Wipe tone="quiet" onClick={() => setStop("uninstall")}>
+                      Remove everything
+                    </Wipe>
+                  </div>
+                )}
+                {stop === "deactivate" && (
+                  <div className="stack">
+                    <p className="muted">Stops the program and removes the login item. The store and skills stay. Run install again to start.</p>
+                    <div className="picks">
+                      <Wipe tone="flag" onClick={onDeactivate}>
+                        Confirm stop
+                      </Wipe>
+                      <Wipe tone="quiet" onClick={() => setStop(null)}>
+                        Cancel
+                      </Wipe>
+                    </div>
+                  </div>
+                )}
+                {stop === "uninstall" && (
+                  <div className="stack">
+                    <p className="muted">Removes the program, store, login item, PATH link, and EDwaRd skill files. Same as uninstall.sh.</p>
+                    <div className="picks">
+                      <Wipe tone="flag" onClick={onUninstall}>
+                        Confirm remove
+                      </Wipe>
+                      <Wipe tone="quiet" onClick={() => setStop(null)}>
+                        Cancel
+                      </Wipe>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}

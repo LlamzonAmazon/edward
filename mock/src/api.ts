@@ -74,3 +74,5 @@ export const notes = (text: string) => post<Store>("/api/notes", { text });
 export const hook = (agentIds: string[]) => post<Store>("/api/hook", { agentIds });
 export const firstRun = (done: boolean) => post<Store>("/api/first-run", { done });
 export const openPrivacy = (pane: "files" | "fda") => post<{ ok: true }>("/api/open-privacy", { pane });
+export const deactivate = () => post<{ ok: true }>("/api/deactivate", { confirm: true });
+export const uninstall = () => post<{ ok: true }>("/api/uninstall", { confirm: true });

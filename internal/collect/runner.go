@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"edward/internal/hook"
+	"edward/internal/lifecycle"
 	"edward/internal/playbook"
 	"edward/internal/store"
 )
@@ -236,6 +237,24 @@ func (r *Runner) SetPaused(paused bool) *store.Store {
 		go r.Tick()
 	}
 	return out
+}
+
+// Deactivate stops the LaunchAgent and exits. The store and skills stay on disk.
+func (r *Runner) Deactivate() error {
+	if err := lifecycle.StopAgent(r.dataDir); err != nil {
+		return err
+	}
+	lifecycle.ExitSoon()
+	return nil
+}
+
+// Uninstall removes the LaunchAgent, skills, PATH link, and data directory, then exits.
+func (r *Runner) Uninstall() error {
+	if err := lifecycle.Uninstall(r.dataDir); err != nil {
+		return err
+	}
+	lifecycle.ExitSoon()
+	return nil
 }
 
 func (r *Runner) SetFiles(on bool) *store.Store {

@@ -35,8 +35,10 @@ One process binds `127.0.0.1:43393` only. Refuse any other host or port. Serve t
 | POST | `/api/hook` | `{ "agentIds": string[] }` | Store. Writes skill files and sentinel blocks for those agents only. |
 | POST | `/api/first-run` | `{ "done": bool }` | Store. |
 | POST | `/api/open-privacy` | `{ "pane": "files" \| "fda" }` | `{ "ok": true }`. Opens System Settings to Files and Folders, or to Full Disk Access. Does not start a logs collector. |
+| POST | `/api/deactivate` | `{ "confirm": true }` | `{ "ok": true }`. Removes the user LaunchAgent and exits the process. Store and skills stay. |
+| POST | `/api/uninstall` | `{ "confirm": true }` | `{ "ok": true }`. Same as `uninstall.sh`: LaunchAgent, skills, PATH link, data directory, then exit. |
 
-Unknown paths: 404. Bad JSON: 400. Bind failure at start: exit 1 with a line that names port 43393.
+Unknown paths: 404. Bad JSON: 400. Bind failure at start: exit 1 with a line that names port 43393. `confirm` must be true for deactivate and uninstall.
 
 ## Files toggle
 
