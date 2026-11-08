@@ -266,31 +266,42 @@ export default function App() {
             write(() => postNotes(c), (s) => ({ ...s, agentNotes: c }));
             setToast({ msg: `Saved for ${agentNames(agentIds)}.` });
           }}
-          onDeactivate={() => {
-            if (!live.current) {
-              setToast({ msg: "Fixture only. Deactivate needs the live agent." });
-              return;
-            }
-            postDeactivate()
-              .then(() => {
-                live.current = false;
-                setSettingsOpen(false);
-                setToast({ msg: "EDwaRd stopped. Run install.sh to start again." });
-              })
-              .catch(() => setToast({ msg: "Could not stop EDwaRd." }));
+          paused={store.paused}
+          onPause={() => {
+            const paused = !storeRef.current.paused;
+            write(() => postPause(paused), (s) => ({ ...s, paused }));
           }}
-          onUninstall={() => {
-            if (!live.current) {
-              setToast({ msg: "Fixture only. Remove everything needs the live agent." });
-              return;
+          onDeactivate={async () => {
+            if (!live.current) return "fail";
+            try {
+              await postDeactivate();
+            } catch {
+              /* process may exit before the response arrives */
             }
-            postUninstall()
-              .then(() => {
-                live.current = false;
-                setSettingsOpen(false);
-                setToast({ msg: "EDwaRd removed from this Mac." });
-              })
-              .catch(() => setToast({ msg: "Could not remove EDwaRd." }));
+            await new Promise((r) => setTimeout(r, 400));
+            try {
+              await getStore();
+              return "fail";
+            } catch {
+              live.current = false;
+              return "ok";
+            }
+          }}
+          onUninstall={async () => {
+            if (!live.current) return "fail";
+            try {
+              await postUninstall();
+            } catch {
+              /* process may exit before the response arrives */
+            }
+            await new Promise((r) => setTimeout(r, 400));
+            try {
+              await getStore();
+              return "fail";
+            } catch {
+              live.current = false;
+              return "ok";
+            }
           }}
           onClose={closeSettings}
         />

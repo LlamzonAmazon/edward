@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { categories, Finding, notePicks } from "./data";
-import { CopyButton, Icon, Wipe } from "./ui";
+import { CopyButton, Icon, Swap, Wipe } from "./ui";
 import type { FindingState } from "./App";
 
 type Props = {
@@ -39,15 +39,22 @@ function isPathLike(label: string, value: string) {
 }
 
 function Chips({ finding, st }: { finding: Finding; st: FindingState }) {
+  const chip =
+    st.status === "asked" ? (
+      <span className="chip chip--accent">
+        <Icon name="agent" />
+        With your agent
+      </span>
+    ) : st.status === "cleared" ? (
+      <span className="chip">Cleared by you</span>
+    ) : null;
   return (
     <div className="chips">
-      {st.status === "asked" && (
-        <span className="chip chip--accent">
-          <Icon name="agent" />
-          With your agent
-        </span>
+      {chip && (
+        <Swap swapKey={st.status} className="chips__swap">
+          {chip}
+        </Swap>
       )}
-      {st.status === "cleared" && <span className="chip">Cleared by you</span>}
       {finding.facts.map((f) => (
         <span key={f} className="chip">
           {f}
@@ -93,44 +100,46 @@ function Detail({ finding, st, agentNames, onClear, onAsk, onNote }: Props) {
               </div>
             </div>
 
-            {st.note ? (
-              <div className="field">
-                <span className="field__label">Saved for {agentNames}</span>
-                <div className="note">
-                  <Icon name="agent" />
-                  <span>“{st.note}.”</span>
-                  <button className="note__edit" onClick={() => onNote(undefined)}>
-                    Change
-                  </button>
+            <div className="step" key={st.note ? "saved" : "edit"} data-dir="next">
+              {st.note ? (
+                <div className="field">
+                  <span className="field__label">Saved for {agentNames}</span>
+                  <div className="note">
+                    <Icon name="agent" />
+                    <span>“{st.note}.”</span>
+                    <button className="note__edit" onClick={() => onNote(undefined)}>
+                      Change
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <form
-                className="field"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (draft.trim()) onNote(draft.trim().replace(/\.$/, ""));
-                }}
-              >
-                <label className="field__label" htmlFor="note">
-                  Your note
-                </label>
-                <div className="picks">
-                  {notePicks.map((p) => (
-                    <Wipe key={p} tone="quiet" size="s" onClick={() => onNote(p)}>
-                      {p}
+              ) : (
+                <form
+                  className="field"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (draft.trim()) onNote(draft.trim().replace(/\.$/, ""));
+                  }}
+                >
+                  <label className="field__label" htmlFor="note">
+                    Your note
+                  </label>
+                  <div className="picks">
+                    {notePicks.map((p) => (
+                      <Wipe key={p} tone="quiet" size="s" onClick={() => onNote(p)}>
+                        {p}
+                      </Wipe>
+                    ))}
+                  </div>
+                  <input id="note" className="field__input" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Or write your own" />
+                  <div>
+                    <Wipe tone={draft.trim() ? "accent" : "quiet"} size="s" disabled={!draft.trim()}>
+                      <Icon name="check" />
+                      Save note for {agentNames}
                     </Wipe>
-                  ))}
-                </div>
-                <input id="note" className="field__input" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Or write your own" />
-                <div>
-                  <Wipe tone={draft.trim() ? "accent" : "quiet"} size="s" disabled={!draft.trim()}>
-                    <Icon name="check" />
-                    Save note for {agentNames}
-                  </Wipe>
-                </div>
-              </form>
-            )}
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
 
           <div className="stack stack--loose">

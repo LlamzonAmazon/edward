@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { agentNames, askSketchy, askSurface } from "./data";
-import { CopyField, Icon, token, Wipe } from "./ui";
+import { CopyField, Icon, Swap, token, Wipe } from "./ui";
 import { AccessList, AgentPicks, Device, SkillPreview } from "./Setup";
 
 type Props = {
@@ -31,7 +31,9 @@ export function FirstRun({ agentIds, onAgents, onClose, onWritten }: Props) {
   return (
     <>
       <div className="dialog__head">
-        <h2 className="t-title grow">{titles[step]}</h2>
+        <h2 className="t-title grow">
+          <Swap swapKey={step}>{titles[step]}</Swap>
+        </h2>
         <button className="icon-btn" onClick={onClose} aria-label="Close">
           <Icon name="close" />
         </button>
@@ -83,8 +85,8 @@ export function FirstRun({ agentIds, onAgents, onClose, onWritten }: Props) {
           </Wipe>
         )}
         {step === 2 && (
-          <Wipe tone="accent" done={written} disabled={!agentIds.length} onClick={write}>
-            <Icon name="check" />
+          <Wipe tone="accent" done={written} swapKey={written ? "written" : "write"} disabled={!agentIds.length} onClick={write}>
+            <Icon name={written ? "check" : "arrow"} />
             {written ? "Written" : `Write to ${agentIds.length} ${agentIds.length === 1 ? "agent" : "agents"}`}
           </Wipe>
         )}

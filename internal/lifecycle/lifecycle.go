@@ -9,63 +9,125 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
 const label = "com.edward.agent"
 
-// StopAgent removes the user LaunchAgent so EDwaRd does not start at login.
-// The process is left running; the caller should exit after responding.
+// StopAgent schedules removal of the user LaunchAgent after this process exits.
+// It must not launchctl bootout in-process: bootout kills this job before the
+// HTTP response and before ExitSoon can run.
 func StopAgent(dataDir string) error {
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("deactivate is macOS only in this build")
 	}
-	plist := plistPath()
-	uid := uidString()
-	domain := "gui/" + uid
-	if fileExists(plist) {
-		_ = exec.Command("/bin/launchctl", "bootout", domain, plist).Run()
-	}
-	_ = exec.Command("/bin/launchctl", "bootout", domain+"/"+label).Run()
-	if fileExists(plist) {
-		if err := os.Remove(plist); err != nil {
-			return fmt.Errorf("remove LaunchAgent: %w", err)
-		}
-	}
 	_ = dataDir
+	scheduleDetached(stopScript())
 	return nil
 }
 
-// Uninstall stops the LaunchAgent, removes agent skill files and the PATH link,
-// and schedules deletion of the data directory after this process exits.
+// Uninstall removes skill files, sentinel blocks, and the PATH link while this
+// process is still alive, then schedules LaunchAgent teardown and deletion of
+// the data directory after exit. Bootout runs only in that detached script so
+// cleanup is not cut short when launchctl stops the job.
 func Uninstall(dataDir string) error {
-	if err := StopAgent(dataDir); err != nil {
-		return err
-	}
 	home := homeDir()
 	stripSentinels(filepath.Join(home, ".claude", "CLAUDE.md"))
 	stripSentinels(filepath.Join(home, ".codex", "AGENTS.md"))
-	for _, d := range []string{
-		filepath.Join(home, ".cursor", "skills", "edward"),
-		filepath.Join(home, ".claude", "skills", "edward"),
-		filepath.Join(home, ".codex", "skills", "edward"),
-		filepath.Join(home, ".openclaw", "skills", "edward"),
-	} {
+	for _, d := range skillDirs(home) {
 		_ = os.RemoveAll(d)
 	}
-	link := filepath.Join(home, ".local", "bin", "edward")
-	if target, err := os.Readlink(link); err == nil {
-		bin := filepath.Join(dataDir, "EDwaRd.app", "Contents", "MacOS", "edward")
-		if target == bin || strings.HasSuffix(target, "/EDwaRd.app/Contents/MacOS/edward") {
-			_ = os.Remove(link)
-		}
-	}
-	scheduleRemove(dataDir)
+	removePathLink(home, dataDir)
+	scheduleDetached(uninstallScript(dataDir))
 	return nil
 }
 
 func ExitSoon() {
-	time.AfterFunc(250*time.Millisecond, func() { os.Exit(0) })
+	time.AfterFunc(500*time.Millisecond, func() { os.Exit(0) })
+}
+
+func skillDirs(home string) []string {
+	return []string{
+		filepath.Join(home, ".cursor", "skills", "edward"),
+		filepath.Join(home, ".claude", "skills", "edward"),
+		filepath.Join(home, ".codex", "skills", "edward"),
+		filepath.Join(home, ".openclaw", "skills", "edward"),
+	}
+}
+
+func removePathLink(home, dataDir string) {
+	link := filepath.Join(home, ".local", "bin", "edward")
+	target, err := os.Readlink(link)
+	if err != nil {
+		return
+	}
+	bin := filepath.Join(dataDir, "EDwaRd.app", "Contents", "MacOS", "edward")
+	if target == bin || strings.Contains(target, "/EDwaRd.app/Contents/MacOS/edward") || strings.HasPrefix(target, dataDir+string(os.PathSeparator)) {
+		_ = os.Remove(link)
+	}
+}
+
+func stopScript() string {
+	plist := plistPath()
+	uid := uidString()
+	domain := "gui/" + uid
+	lines := []string{
+		"sleep 1",
+		fmt.Sprintf("launchctl bootout %s %s 2>/dev/null || true", shellQuote(domain), shellQuote(plist)),
+	}
+	// When EDWARD_LAUNCH_AGENTS is set (tests), only touch that plist. Never bootout the real user label.
+	if os.Getenv("EDWARD_LAUNCH_AGENTS") == "" {
+		lines = append(lines, fmt.Sprintf("launchctl bootout %s/%s 2>/dev/null || true", shellQuote(domain), shellQuote(label)))
+	}
+	lines = append(lines, fmt.Sprintf("rm -f %s", shellQuote(plist)))
+	return strings.Join(lines, "\n")
+}
+
+func uninstallScript(dataDir string) string {
+	if dataDir == "" || dataDir == "/" || dataDir == homeDir() {
+		return stopScript()
+	}
+	home := homeDir()
+	plist := plistPath()
+	uid := uidString()
+	domain := "gui/" + uid
+	bin := filepath.Join(dataDir, "EDwaRd.app", "Contents", "MacOS", "edward")
+	link := filepath.Join(home, ".local", "bin", "edward")
+	lines := []string{
+		"sleep 2",
+		fmt.Sprintf("launchctl bootout %s %s 2>/dev/null || true", shellQuote(domain), shellQuote(plist)),
+	}
+	if os.Getenv("EDWARD_LAUNCH_AGENTS") == "" {
+		lines = append(lines, fmt.Sprintf("launchctl bootout %s/%s 2>/dev/null || true", shellQuote(domain), shellQuote(label)))
+	}
+	lines = append(lines,
+		fmt.Sprintf("rm -f %s", shellQuote(plist)),
+		fmt.Sprintf("pkill -f %s 2>/dev/null || true", shellQuote(bin)),
+		"sleep 1",
+		fmt.Sprintf("rm -rf %s", shellQuote(dataDir)),
+		fmt.Sprintf("rm -f %s", shellQuote(link)),
+	)
+	for _, d := range skillDirs(home) {
+		lines = append(lines, fmt.Sprintf("rm -rf %s", shellQuote(d)))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func scheduleDetached(script string) {
+	if script == "" {
+		return
+	}
+	// Tests set this so Uninstall can assert file cleanup without spawning a live shell.
+	if os.Getenv("EDWARD_SKIP_DETACH") != "" {
+		return
+	}
+	cmd := exec.Command("/bin/sh", "-c", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.Stdin = nil
+	_ = cmd.Start()
 }
 
 func plistPath() string {
@@ -94,11 +156,6 @@ func uidString() string {
 	return u.Uid
 }
 
-func fileExists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
-}
-
 func stripSentinels(path string) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -118,15 +175,6 @@ func stripSentinels(path string) {
 		return
 	}
 	_ = os.WriteFile(path, []byte(out), 0o644)
-}
-
-func scheduleRemove(dataDir string) {
-	if dataDir == "" || dataDir == "/" || dataDir == homeDir() {
-		return
-	}
-	script := fmt.Sprintf("sleep 1; rm -rf %s", shellQuote(dataDir))
-	cmd := exec.Command("/bin/sh", "-c", script)
-	_ = cmd.Start()
 }
 
 func shellQuote(s string) string {

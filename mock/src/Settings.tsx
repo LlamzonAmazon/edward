@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { agentNames, categories, Finding } from "./data";
-import { Icon, Wipe } from "./ui";
+import { Icon, Swap, Wipe } from "./ui";
 import { AccessList, AgentPicks, Device } from "./Setup";
 import { useSurface } from "./surface";
 import type { FindingState } from "./App";
@@ -15,12 +15,15 @@ type Props = {
   onContext: (c: string) => void;
   state: Record<string, FindingState>;
   onNote: (id: string, note: string | undefined) => void;
-  onDeactivate: () => void;
-  onUninstall: () => void;
+  paused: boolean;
+  onPause: () => void;
+  onDeactivate: () => Promise<"ok" | "fail">;
+  onUninstall: () => Promise<"ok" | "fail">;
   onClose: () => void;
 };
 
-type StopKind = "deactivate" | "uninstall" | null;
+type StopKind = "pause" | "off" | "delete" | null;
+type StopPhase = "pick" | "confirm" | "working" | "done" | "fail";
 
 const titles: Record<View, string> = {
   main: "Settings",
@@ -29,24 +32,54 @@ const titles: Record<View, string> = {
 };
 
 export function Settings(props: Props) {
-  const { open, agentIds, onAgents, context, state, onDeactivate, onUninstall, onClose } = props;
+  const { open, agentIds, onAgents, context, state, paused, onPause, onDeactivate, onUninstall, onClose } = props;
   const { findings } = useSurface();
   const [view, setView] = useState<View>("main");
   const [dir, setDir] = useState<"next" | "back">("next");
-  const [stop, setStop] = useState<StopKind>(null);
+  const [stopKind, setStopKind] = useState<StopKind>(null);
+  const [stopPhase, setStopPhase] = useState<StopPhase>("pick");
+  const [stopMsg, setStopMsg] = useState("");
   useEffect(() => {
     if (open) {
       setView("main");
-      setStop(null);
+      setStopKind(null);
+      setStopPhase("pick");
+      setStopMsg("");
     }
   }, [open]);
   const go = (v: View) => {
     setDir(v === "main" ? "back" : "next");
     setView(v);
-    setStop(null);
+    setStopKind(null);
+    setStopPhase("pick");
+    setStopMsg("");
   };
   const noted = findings.filter((f) => state[f.id]?.note);
   const firstLine = context.split("\n")[0];
+
+  const choose = (kind: StopKind) => {
+    setStopKind(kind);
+    setStopPhase("confirm");
+    setStopMsg("");
+  };
+
+  const runStop = async () => {
+    if (!stopKind || stopKind === "pause") return;
+    setStopPhase("working");
+    setStopMsg(stopKind === "off" ? "Turning EDwaRd off…" : "Deleting EDwaRd from this Mac…");
+    const result = stopKind === "off" ? await onDeactivate() : await onUninstall();
+    if (result === "ok") {
+      setStopPhase("done");
+      setStopMsg(
+        stopKind === "off"
+          ? "EDwaRd is off. It will not start at login. Your store is still on disk. Close this tab. To start again: make mock && make app && sh install.sh"
+          : "EDwaRd is deleted from this Mac. Close this tab. The page will not load again until you install.",
+      );
+      return;
+    }
+    setStopPhase("fail");
+    setStopMsg(stopKind === "off" ? "Could not turn EDwaRd off. Is the agent running?" : "Could not delete EDwaRd. Is the agent running?");
+  };
 
   return (
     <>
@@ -60,8 +93,10 @@ export function Settings(props: Props) {
             <Icon name="back" />
           </button>
         )}
-        <h2 className="t-title grow">{titles[view]}</h2>
-        <button className="icon-btn" onClick={onClose} aria-label="Close">
+        <h2 className="t-title grow">
+          <Swap swapKey={view}>{titles[view]}</Swap>
+        </h2>
+        <button className="icon-btn" onClick={onClose} aria-label="Close" disabled={stopPhase === "working"}>
           <Icon name="close" />
         </button>
       </div>
@@ -92,44 +127,80 @@ export function Settings(props: Props) {
                 <AccessList />
               </div>
               <div className="section">
-                <span className="t-head">Stop</span>
-                <p className="muted">Pause is Looking / Paused at the bottom of the sidebar. It keeps the program running.</p>
-                {!stop && (
-                  <div className="picks">
-                    <Wipe tone="quiet" onClick={() => setStop("deactivate")}>
-                      Stop EDwaRd
-                    </Wipe>
-                    <Wipe tone="quiet" onClick={() => setStop("uninstall")}>
-                      Remove everything
-                    </Wipe>
-                  </div>
-                )}
-                {stop === "deactivate" && (
-                  <div className="stack">
-                    <p className="muted">Stops the program and removes the login item. The store and skills stay. Run install again to start.</p>
-                    <div className="picks">
-                      <Wipe tone="flag" onClick={onDeactivate}>
-                        Confirm stop
-                      </Wipe>
-                      <Wipe tone="quiet" onClick={() => setStop(null)}>
-                        Cancel
-                      </Wipe>
+                <span className="t-head">Pause, turn off, or delete</span>
+                <div className="step stack" key={`${stopPhase}-${stopKind ?? "none"}`} data-dir="next">
+                  {stopPhase === "pick" && (
+                    <>
+                      <p className="muted">Three different actions. Pause keeps the program running. Turn off quits it. Delete removes it.</p>
+                      <div className="list">
+                        <StopChoice
+                          title={paused ? "Resume looking" : "Pause looking"}
+                          detail={paused ? "Collectors are stopped. Click to start them again." : "Stop collectors only. The program stays running. Same as Looking / Paused in the sidebar."}
+                          action={paused ? "Resume" : "Pause"}
+                          swapKey={paused ? "paused" : "looking"}
+                          onClick={() => {
+                            onPause();
+                            setStopMsg(paused ? "Looking again." : "Paused. Collectors are stopped until you resume.");
+                          }}
+                        />
+                        <StopChoice title="Turn off EDwaRd" detail="Quit the program and remove the login item. Store and skills stay on disk. Install again to start." action="Turn off" onClick={() => choose("off")} />
+                        <StopChoice title="Delete EDwaRd from this Mac" detail="Remove the program, store, login item, PATH link, and EDwaRd skill files. Same as uninstall.sh." action="Delete" onClick={() => choose("delete")} />
+                      </div>
+                      {stopMsg ? (
+                        <p className="t-strong step" key={stopMsg} data-dir="next">
+                          {stopMsg}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                  {stopPhase === "confirm" && stopKind === "off" && (
+                    <div className="stack">
+                      <p className="t-strong">Turn off EDwaRd?</p>
+                      <p className="muted">The program quits now and will not start at login. Your findings store stays. Skills stay. To run again you install from the repo.</p>
+                      <div className="picks">
+                        <Wipe tone="flag" onClick={runStop}>
+                          Yes, turn off
+                        </Wipe>
+                        <Wipe tone="quiet" onClick={() => setStopPhase("pick")}>
+                          Cancel
+                        </Wipe>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {stop === "uninstall" && (
-                  <div className="stack">
-                    <p className="muted">Removes the program, store, login item, PATH link, and EDwaRd skill files. Same as uninstall.sh.</p>
-                    <div className="picks">
-                      <Wipe tone="flag" onClick={onUninstall}>
-                        Confirm remove
-                      </Wipe>
-                      <Wipe tone="quiet" onClick={() => setStop(null)}>
-                        Cancel
-                      </Wipe>
+                  )}
+                  {stopPhase === "confirm" && stopKind === "delete" && (
+                    <div className="stack">
+                      <p className="t-strong">Delete EDwaRd from this Mac?</p>
+                      <p className="muted">This removes the program, the store, the login item, the PATH link, and the EDwaRd skill files. It does not undo macOS privacy grants.</p>
+                      <div className="picks">
+                        <Wipe tone="flag" onClick={runStop}>
+                          Yes, delete
+                        </Wipe>
+                        <Wipe tone="quiet" onClick={() => setStopPhase("pick")}>
+                          Cancel
+                        </Wipe>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                  {(stopPhase === "working" || stopPhase === "done" || stopPhase === "fail") && (
+                    <div className="stack">
+                      <p className="t-strong">
+                        <Swap swapKey={stopPhase}>{stopPhase === "working" ? "Working…" : stopPhase === "done" ? "Done" : "Did not finish"}</Swap>
+                      </p>
+                      <p className="muted">
+                        <Swap block swapKey={stopMsg}>
+                          {stopMsg}
+                        </Swap>
+                      </p>
+                      {stopPhase !== "working" && (
+                        <div className="picks">
+                          <Wipe tone="accent" onClick={onClose}>
+                            Close
+                          </Wipe>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -147,6 +218,28 @@ export function Settings(props: Props) {
         </div>
       </div>
     </>
+  );
+}
+
+function StopChoice({ title, detail, action, swapKey, onClick }: { title: string; detail: string; action: string; swapKey?: string; onClick: () => void }) {
+  return (
+    <div className="row">
+      <div className="row__head" style={{ cursor: "default" }}>
+        <span className="row__text">
+          <span className="row__title">
+            <Swap swapKey={swapKey ?? title}>{title}</Swap>
+          </span>
+          <span className="row__detail">
+            <Swap block swapKey={swapKey ?? detail}>
+              {detail}
+            </Swap>
+          </span>
+        </span>
+        <Wipe tone="quiet" size="s" swapKey={swapKey ?? action} onClick={onClick}>
+          {action}
+        </Wipe>
+      </div>
+    </div>
   );
 }
 
@@ -189,7 +282,7 @@ function AgentNotes({ agentIds, context, onContext }: Props) {
         placeholder={"Port 3000 is always my dev server.\nIgnore anything in ~/scratch."}
       />
       <div>
-        <Wipe tone="accent" done={!changed && !!context} disabled={!changed}>
+        <Wipe tone="accent" done={!changed && !!context} swapKey={!changed && context ? "saved" : "save"} disabled={!changed}>
           <Icon name="check" />
           {!changed && context ? `Saved for ${agentNames(agentIds)}` : `Save for ${agentNames(agentIds)}`}
         </Wipe>

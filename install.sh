@@ -206,13 +206,19 @@ fi
 
 echo "http://127.0.0.1:43393"
 i=0
-while [ "$i" -lt 15 ]; do
+up=0
+while [ "$i" -lt 20 ]; do
 	if command -v curl >/dev/null 2>&1 && curl -sf --max-time 1 "http://127.0.0.1:43393/" >/dev/null 2>&1; then
+		up=1
 		break
 	fi
 	i=$((i + 1))
 	sleep 1
 done
+if [ "$up" -ne 1 ]; then
+	echo "Installed, but http://127.0.0.1:43393 did not answer within 20s. Check: launchctl print \"gui/$(id -u)/com.edward.agent\"" >&2
+	exit 1
+fi
 
 if command -v open >/dev/null 2>&1; then
 	open "http://127.0.0.1:43393" || true

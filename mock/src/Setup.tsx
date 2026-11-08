@@ -81,6 +81,7 @@ export function AccessList() {
               tone="quiet"
               size="s"
               done={opened.includes(a.id)}
+              swapKey={opened.includes(a.id) ? "waiting" : "open"}
               onClick={() => {
                 setOpened([...opened, a.id]);
                 void openPrivacy("fda").catch(() => {});

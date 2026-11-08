@@ -25,11 +25,11 @@ Findings in the store already include the playbook callouts. Do not fetch anothe
 
 Offer these three options. Do not pick one for me unless I already named it.
 
-1. **Pause.** Collectors stop. The process and LaunchAgent stay. Looking / Paused on the page, or `POST http://127.0.0.1:43393/api/pause` with `{"paused":true}`. Resume with `{"paused":false}`.
-2. **Deactivate.** The program stops and does not start at login. The store and skills stay. Settings → Stop → Stop EDwaRd, or `POST http://127.0.0.1:43393/api/deactivate` with `{"confirm":true}`. Start again with `sh install.sh` from the repo (after `make mock && make app` if needed).
-3. **Uninstall.** Removes the program, store, LaunchAgent, PATH link, and EDwaRd skill files. Settings → Stop → Remove everything, or `POST http://127.0.0.1:43393/api/uninstall` with `{"confirm":true}`, or `sh uninstall.sh` from the repo.
+1. **Pause looking.** Collectors stop. The program stays running. Settings → Pause looking, or Looking / Paused in the sidebar, or `POST http://127.0.0.1:43393/api/pause` with `{"paused":true}`. Resume with `{"paused":false}`.
+2. **Turn off.** The program quits and does not start at login. Store and skills stay. Settings → Turn off EDwaRd, or `POST http://127.0.0.1:43393/api/deactivate` with `{"confirm":true}`. Start again with `make mock && make app && sh install.sh` from the repo.
+3. **Delete from this Mac.** Removes the program, store, login item, PATH link, and EDwaRd skill files. Settings → Delete EDwaRd from this Mac, or `POST http://127.0.0.1:43393/api/uninstall` with `{"confirm":true}`, or `sh uninstall.sh` from the repo.
 
-After deactivate or uninstall, the page on port 43393 will not answer. Say that plainly.
+After turn off or delete, the page on port 43393 will not answer. Say that plainly.
 
 ## Do not
 

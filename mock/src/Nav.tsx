@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { askSketchy, categories, raisedShown, Finding, Source } from "./data";
 import { useSurface } from "./surface";
-import { Chevron, CopyButton, Icon, Reveal } from "./ui";
+import { Chevron, CopyButton, Icon, Reveal, Swap } from "./ui";
 import type { FindingState, Status } from "./App";
 import logo from "./assets/edward-logo.png";
 
@@ -114,8 +114,12 @@ export function Nav(props: Props) {
         <div className="nav__foot-row">
           <button className="status" data-paused={paused} onClick={onPause} aria-label={paused ? "Resume" : "Pause"}>
             <span className="dot" data-tick={tick} key={paused ? "p" : tick ? "tick" : "idle"} />
-            {paused ? "Paused" : `Looking · ${readAgo.toLowerCase()}`}
-            <Icon name={paused ? "play" : "pause"} />
+            <Swap className="status__label" swapKey={paused ? "paused" : "looking"}>
+              {paused ? "Paused" : `Looking · ${readAgo.toLowerCase()}`}
+            </Swap>
+            <Swap className="status__icon" swapKey={paused ? "play" : "pause"}>
+              <Icon name={paused ? "play" : "pause"} />
+            </Swap>
           </button>
           <button className="icon-btn" data-active={settingsOpen} onClick={onSettings} aria-label="Settings">
             <Icon name="settings" />

@@ -211,14 +211,23 @@ fi
 remove_path "$PLIST" || true
 
 # 2. Program files, store, notes.
-remove_path "$APPDIR" || exit 1
+remove_path "$APPDIR" || true
+if [ -e "$APPDIR" ] || [ -L "$APPDIR" ]; then
+	# Retry after a short wait in case the binary was still shutting down.
+	sleep 1
+	stop_by_bin "$BIN"
+	remove_path "$APPDIR" || true
+fi
 if [ -L "$LINK" ]; then
 	target=$(readlink "$LINK" 2>/dev/null || true)
-	if [ "$target" = "$BIN" ] || [ -z "$target" ]; then
+	case "$target" in
+	"$BIN" | */EDwaRd.app/Contents/MacOS/edward | "")
 		remove_path "$LINK" || true
-	else
+		;;
+	*)
 		report "left in place" "$LINK"
-	fi
+		;;
+	esac
 elif [ -e "$LINK" ]; then
 	report "left in place" "$LINK"
 else
@@ -238,7 +247,7 @@ for d in \
 	remove_path "$d" || true
 done
 
-# 5. Confirm the page on 43393 is gone.
+# 5. Confirm the page on 43393 is gone. If our binary still holds it, kill and recheck.
 if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:43393 -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { found=1 } END { exit found ? 0 : 1 }'; then
 	pid=$(lsof -nP -iTCP:43393 -sTCP:LISTEN -t 2>/dev/null | awk 'NR==1 { print; exit }') || pid=
 	cmd=
@@ -246,10 +255,20 @@ if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:43393 -sTCP:LISTEN 2>/dev/n
 		cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
 	fi
 	case "$cmd" in
-	"$BIN" | "$BIN "*)
-		report "left in place" "127.0.0.1:43393"
-		echo "EDwaRd is still listening on 127.0.0.1:43393 pid $pid" >&2
-		status=1
+	"$BIN" | "$BIN "* | *"/EDwaRd.app/Contents/MacOS/edward" | *"/EDwaRd.app/Contents/MacOS/edward "*)
+		stop_by_bin "$BIN"
+		if [ -n "$pid" ]; then
+			kill "$pid" 2>/dev/null || true
+			sleep 1
+			kill -9 "$pid" 2>/dev/null || true
+		fi
+		if lsof -nP -iTCP:43393 -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { found=1 } END { exit found ? 0 : 1 }'; then
+			report "left in place" "127.0.0.1:43393"
+			echo "EDwaRd is still listening on 127.0.0.1:43393" >&2
+			status=1
+		else
+			report "removed" "127.0.0.1:43393"
+		fi
 		;;
 	*)
 		report "left in place" "127.0.0.1:43393"
@@ -259,6 +278,77 @@ if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:43393 -sTCP:LISTEN 2>/dev/n
 else
 	report "already absent" "127.0.0.1:43393"
 fi
+
+# 6. Final sweep + verify. Install artifacts must be gone.
+for p in \
+	"$PLIST" \
+	"$APPDIR" \
+	"$HOME/.cursor/skills/edward" \
+	"$HOME/.claude/skills/edward" \
+	"$HOME/.codex/skills/edward" \
+	"$HOME/.openclaw/skills/edward"; do
+	if [ -e "$p" ] || [ -L "$p" ]; then
+		rm -rf "$p" 2>/dev/null || true
+	fi
+done
+if [ -L "$LINK" ]; then
+	target=$(readlink "$LINK" 2>/dev/null || true)
+	case "$target" in
+	"$BIN" | */EDwaRd.app/Contents/MacOS/edward | "")
+		rm -f "$LINK" 2>/dev/null || true
+		;;
+	esac
+fi
+
+verify_absent() {
+	path=$1
+	if [ -e "$path" ] || [ -L "$path" ]; then
+		report "left in place" "$path"
+		echo "Uninstall left $path behind." >&2
+		status=1
+		return 1
+	fi
+	report "verified absent" "$path"
+	return 0
+}
+
+verify_absent "$PLIST"
+verify_absent "$APPDIR"
+verify_absent "$HOME/.cursor/skills/edward"
+verify_absent "$HOME/.claude/skills/edward"
+verify_absent "$HOME/.codex/skills/edward"
+verify_absent "$HOME/.openclaw/skills/edward"
+if [ -L "$LINK" ]; then
+	target=$(readlink "$LINK" 2>/dev/null || true)
+	case "$target" in
+	"$BIN" | */EDwaRd.app/Contents/MacOS/edward | "")
+		report "left in place" "$LINK"
+		echo "Uninstall left $LINK behind." >&2
+		status=1
+		;;
+	*)
+		report "left in place" "$LINK (not EDwaRd; not removed)"
+		;;
+	esac
+elif [ -e "$LINK" ]; then
+	report "left in place" "$LINK (not a symlink; not removed)"
+else
+	report "verified absent" "$LINK"
+fi
+if [ "$os" = Darwin ] && launchctl print "$domain/com.edward.agent" >/dev/null 2>&1; then
+	report "left in place" "$domain/com.edward.agent"
+	echo "LaunchAgent com.edward.agent is still loaded." >&2
+	status=1
+else
+	report "verified absent" "$domain/com.edward.agent"
+fi
+for f in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"; do
+	if [ -f "$f" ] && grep -q "edward:start\|edward:end" "$f" 2>/dev/null; then
+		report "left in place" "sentinels in $f"
+		echo "Uninstall left edward sentinels in $f." >&2
+		status=1
+	fi
+done
 
 echo "not touched: project .cursor/rules, project CLAUDE.md, project AGENTS.md"
 echo "not touched: the rest of ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md"

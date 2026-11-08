@@ -1,5 +1,29 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, TransitionEvent, isValidElement, useEffect, useRef, useState } from "react";
 import type { IconName } from "./data";
+
+function useReducedMotion() {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduce(mq.matches);
+    const onChange = () => setReduce(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduce;
+}
+
+/** Stable key for Swap: prefer an explicit swapKey, else derive from text/icons. */
+function contentKey(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(contentKey).join("|");
+  if (isValidElement(node)) {
+    const props = node.props as { children?: ReactNode; name?: string };
+    return `${String(node.key ?? "")}:${props.name ?? ""}:${contentKey(props.children)}`;
+  }
+  return "";
+}
 
 export function token(name: string): number {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -138,6 +162,78 @@ export function Icon({ name }: { name: AnyIcon }) {
   );
 }
 
+/**
+ * In-place content wipe. Same left-to-right clip as Wipe, for titles, details,
+ * and any label that changes without unmounting the parent.
+ * Pass swapKey when children update often (tickers) but should only wipe on real state changes.
+ */
+export function Swap({
+  children,
+  swapKey,
+  block,
+  className = "",
+}: {
+  children: ReactNode;
+  swapKey?: string | number | boolean;
+  block?: boolean;
+  className?: string;
+}) {
+  const key = swapKey !== undefined ? String(swapKey) : contentKey(children);
+  const reduce = useReducedMotion();
+  const [current, setCurrent] = useState(children);
+  const [currentKey, setCurrentKey] = useState(key);
+  const [incoming, setIncoming] = useState<ReactNode>(null);
+  const [incomingKey, setIncomingKey] = useState(key);
+  const [phase, setPhase] = useState<"idle" | "prep" | "go">("idle");
+
+  useEffect(() => {
+    if (key === currentKey && phase === "idle") {
+      setCurrent(children);
+    }
+  }, [children, key, currentKey, phase]);
+
+  useEffect(() => {
+    if (key === currentKey) return;
+    if (reduce) {
+      setCurrent(children);
+      setCurrentKey(key);
+      setIncoming(null);
+      setPhase("idle");
+      return;
+    }
+    setIncoming(children);
+    setIncomingKey(key);
+    setPhase("prep");
+  }, [key, children, currentKey, reduce]);
+
+  useEffect(() => {
+    if (phase !== "prep") return;
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setPhase("go"));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [phase]);
+
+  const finish = (e: TransitionEvent<HTMLSpanElement>) => {
+    if (phase !== "go" || e.propertyName !== "clip-path") return;
+    setCurrent(incoming);
+    setCurrentKey(incomingKey);
+    setIncoming(null);
+    setPhase("idle");
+  };
+
+  return (
+    <span className={["swap", block ? "swap--block" : "", className].filter(Boolean).join(" ")} data-phase={phase === "go" ? "go" : phase === "prep" ? "prep" : "idle"}>
+      <span className="swap__base">{current}</span>
+      {incoming != null && (
+        <span className="swap__layer" onTransitionEnd={finish}>
+          {incoming}
+        </span>
+      )}
+    </span>
+  );
+}
+
 type WipeProps = {
   tone?: "accent" | "flag" | "quiet";
   size?: "s" | "m";
@@ -150,15 +246,25 @@ type WipeProps = {
   onMouseLeave?: () => void;
   children: ReactNode;
   label?: string;
+  /** When set, label Swap only fires when this changes (plus done). */
+  swapKey?: string | number | boolean;
 };
 
-export function Wipe({ tone = "accent", size = "m", block, done, disabled, className = "", onClick, onMouseEnter, onMouseLeave, children, label }: WipeProps) {
+export function Wipe({ tone = "accent", size = "m", block, done, disabled, className = "", onClick, onMouseEnter, onMouseLeave, children, label, swapKey }: WipeProps) {
   const cls = ["wipe", `tone-${tone}`, size === "s" ? "wipe--s" : "", block ? "wipe--block" : "", className].join(" ");
+  const key = swapKey !== undefined ? `${swapKey}:${done ? "1" : "0"}` : undefined;
+  const face = (
+    <Swap className="wipe__face" swapKey={key}>
+      {children}
+    </Swap>
+  );
   return (
     <button className={cls} data-done={done ? "true" : undefined} disabled={disabled} onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} aria-label={label}>
-      {children}
+      {face}
       <span className="wipe__layer" aria-hidden>
-        {children}
+        <Swap className="wipe__face" swapKey={key}>
+          {children}
+        </Swap>
       </span>
     </button>
   );
@@ -279,7 +385,7 @@ export function CopyButton({ text, tone = "accent", size = "m", label = "Copy", 
     window.setTimeout(() => setCopied(false), token("--dur-hold"));
   };
   return (
-    <Wipe tone={tone} size={size} done={copied} onClick={click}>
+    <Wipe tone={tone} size={size} done={copied} swapKey={copied ? "copied" : "idle"} onClick={click}>
       <Icon name={copied ? "check" : "copy"} />
       {copied ? "Copied" : label}
     </Wipe>
