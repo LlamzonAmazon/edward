@@ -220,15 +220,16 @@ dd {
   color: var(--accent);
 }
 
-/* Swap: in-place label wipe. Same left-to-right clip as Wipe, for text that
-   changes without unmounting (pause title, status, copy label, dialog titles). */
+/* Swap: in-place label wipe. Old text clips away left-to-right while new text
+   clips in. No opaque cover, so titles never stack on top of each other. */
 .swap {
-  --swap-bg: transparent;
   position: relative;
   display: inline-grid;
   align-items: center;
+  justify-items: start;
   vertical-align: baseline;
   max-width: 100%;
+  overflow: hidden;
 }
 .swap--block {
   display: grid;
@@ -248,13 +249,19 @@ dd {
   display: block;
 }
 .swap__layer {
-  background: var(--swap-bg);
-  clip-path: inset(0 100% 0 0);
   pointer-events: none;
+}
+.swap[data-phase="prep"] .swap__base {
+  transition: none;
+  clip-path: inset(0 0 0 0);
 }
 .swap[data-phase="prep"] .swap__layer {
   transition: none;
   clip-path: inset(0 100% 0 0);
+}
+.swap[data-phase="go"] .swap__base {
+  transition: clip-path var(--dur-base) var(--ease-out);
+  clip-path: inset(0 0 0 100%);
 }
 .swap[data-phase="go"] .swap__layer {
   transition: clip-path var(--dur-base) var(--ease-out);
@@ -269,7 +276,6 @@ dd {
   --w-fg: var(--on-accent);
   --w-bg-hover: var(--ink-900);
   --w-fg-hover: var(--white);
-  --swap-bg: transparent;
   position: relative;
   isolation: isolate;
   overflow: hidden;

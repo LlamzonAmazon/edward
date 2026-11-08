@@ -88,13 +88,11 @@
 
 /* Row */
 .row {
-  --swap-bg: var(--bg);
   border-radius: var(--radius-m);
   transition: background var(--dur-fast) var(--ease-out);
 }
 .row:hover,
 .row[data-open="true"] {
-  --swap-bg: var(--fill);
   background: var(--fill);
 }
 .row__head {
@@ -238,21 +236,18 @@
   transform: translate(-50%, -50%);
 }
 .dialog__head {
-  --swap-bg: var(--bg);
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-5) var(--space-5) 0;
 }
 .dialog__body {
-  --swap-bg: var(--bg);
   padding: var(--space-5);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
 }
 .dialog__foot {
-  --swap-bg: var(--fill);
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -509,7 +504,6 @@ button.nav__heading:hover {
   margin-left: auto;
 }
 .status {
-  --swap-bg: var(--nav);
   flex: none;
   white-space: nowrap;
   display: flex;
@@ -526,7 +520,6 @@ button.nav__heading:hover {
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .status:hover {
-  --swap-bg: var(--nav-hover);
   background: var(--nav-hover);
   color: var(--nav-fg);
 }

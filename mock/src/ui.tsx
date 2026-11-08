@@ -185,6 +185,7 @@ export function Swap({
   const [incoming, setIncoming] = useState<ReactNode>(null);
   const [incomingKey, setIncomingKey] = useState(key);
   const [phase, setPhase] = useState<"idle" | "prep" | "go">("idle");
+  const finishRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (key === currentKey && phase === "idle") {
@@ -214,19 +215,33 @@ export function Swap({
     return () => cancelAnimationFrame(id);
   }, [phase]);
 
-  const finish = (e: TransitionEvent<HTMLSpanElement>) => {
-    if (phase !== "go" || e.propertyName !== "clip-path") return;
+  const finish = () => {
+    if (phase !== "go") return;
     setCurrent(incoming);
     setCurrentKey(incomingKey);
     setIncoming(null);
     setPhase("idle");
+  };
+  finishRef.current = finish;
+
+  useEffect(() => {
+    if (phase !== "go") return;
+    const ms = token("--dur-base") + 80;
+    const id = window.setTimeout(() => finishRef.current(), ms);
+    return () => window.clearTimeout(id);
+  }, [phase]);
+
+  const onLayerEnd = (e: TransitionEvent<HTMLSpanElement>) => {
+    if (e.propertyName !== "clip-path") return;
+    if (e.target !== e.currentTarget) return;
+    finish();
   };
 
   return (
     <span className={["swap", block ? "swap--block" : "", className].filter(Boolean).join(" ")} data-phase={phase === "go" ? "go" : phase === "prep" ? "prep" : "idle"}>
       <span className="swap__base">{current}</span>
       {incoming != null && (
-        <span className="swap__layer" onTransitionEnd={finish}>
+        <span className="swap__layer" onTransitionEnd={onLayerEnd}>
           {incoming}
         </span>
       )}
