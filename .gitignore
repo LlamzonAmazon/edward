@@ -1,0 +1,17 @@
+.DS_Store
+node_modules/
+mock/dist/
+mock/node_modules/
+*.exe
+*.test
+/edward
+/EDwaRd.app
+dist/
+.idea/
+.vscode/
+.cursor/
+*.log
+.env
+.tmp-edward-agent-test/
+internal/server/web/
+docs/

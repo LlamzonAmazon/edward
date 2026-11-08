@@ -1,0 +1,430 @@
+import { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { categories, raisedShown, Finding, Item, Source } from "./data";
+import { useSurface } from "./surface";
+import { Icon, token, Wipe } from "./ui";
+import type { FindingState } from "./App";
+
+type P = { x: number; y: number };
+type Hot = { kind: "hub" | "item"; id: string } | null;
+type Tip = { x: number; y: number; title: string; sub: string } | null;
+type View = { x: number; y: number; k: number };
+
+const RAD = Math.PI / 180;
+const HUB_ANGLES = [-112.5, -67.5, -22.5, 22.5, 67.5, 112.5, 157.5, 202.5];
+const FLAG_STEP = 34;
+const FLAG_ARC = 140;
+const MIN_K = 0.35;
+const MAX_K = 3.5;
+const GRID = 24;
+const IDENTITY: View = { x: 0, y: 0, k: 1 };
+
+const shortWhy: Record<string, string> = {
+  firewall: "Not collected · needs admin",
+  policy: "Not collected · needs admin",
+  logs: "Not collected · closed to you",
+  files: "Off · you turn it on",
+};
+
+const hubKey = (id: string) => `hub:${id}`;
+
+function clamp(n: number, lo: number, hi: number) {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+function liveStatus(item: Item, state: Record<string, FindingState>) {
+  return item.findingId ? state[item.findingId]?.status : undefined;
+}
+
+function onGraph(item: Item, state: Record<string, FindingState>) {
+  const st = liveStatus(item, state);
+  return st === "raised" || st === "asked";
+}
+
+function anchor(dir: P, gap: number): CSSProperties {
+  if (Math.abs(dir.x) >= 0.45) return { transform: `translate(${dir.x < 0 ? `calc(-100% - ${gap}px)` : `${gap}px`}, -50%)` };
+  return { transform: `translate(-50%, ${dir.y < 0 ? `calc(-100% - ${gap}px)` : `${gap}px`})` };
+}
+
+function labelStyle(l: { side: string; q: P; cx: number; y: number }): CSSProperties {
+  const gap = token("--label-gap");
+  if (l.side === "right") return { left: l.q.x + gap, top: l.y, transform: "translate(0, -50%)" };
+  if (l.side === "left") return { left: l.q.x - gap, top: l.y, transform: "translate(-100%, -50%)" };
+  return { left: l.cx, top: l.y, transform: `translate(-50%, ${l.side === "up" ? "-100%" : "0"})` };
+}
+
+export function Graph({
+  state,
+  onSource,
+  onFinding,
+  onItem,
+}: {
+  state: Record<string, FindingState>;
+  onSource: (s: Source) => void;
+  onFinding: (f: Finding) => void;
+  onItem: (s: Source, itemId: string) => void;
+}) {
+  const { sources, findings, links, host } = useSurface();
+  const findingOf = (item: Item) => findings.find((f) => f.id === item.findingId);
+  const ref = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<View>(IDENTITY);
+  const dragRef = useRef<{ px: number; py: number; vx: number; vy: number } | null>(null);
+  const movedRef = useRef(false);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [hot, setHot] = useState<Hot>(null);
+  const [tip, setTip] = useState<Tip>(null);
+  const [lastTip, setLastTip] = useState<Tip>(null);
+  const [view, setView] = useState<View>(IDENTITY);
+  const [dragging, setDragging] = useState(false);
+
+  const applyView = useCallback((next: View) => {
+    viewRef.current = next;
+    setView(next);
+  }, []);
+
+  useEffect(() => {
+    const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(ref.current!);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (tip) setLastTip(tip);
+  }, [tip]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const cur = viewRef.current;
+      if (e.ctrlKey || e.metaKey) {
+        const factor = e.ctrlKey ? Math.exp(-e.deltaY * 0.01) : e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        const nextK = clamp(cur.k * factor, MIN_K, MAX_K);
+        if (nextK === cur.k) return;
+        applyView({
+          x: mx - ((mx - cur.x) * nextK) / cur.k,
+          y: my - ((my - cur.y) * nextK) / cur.k,
+          k: nextK,
+        });
+        return;
+      }
+      applyView({ x: cur.x - e.deltaX, y: cur.y - e.deltaY, k: cur.k });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [applyView]);
+
+  const layout = useMemo(() => {
+    const { w, h } = size;
+    const center = { x: w * 0.45, y: h * 0.47 };
+    const rx = Math.min(w * 0.33, 520);
+    const ry = Math.min(h * 0.3, 300);
+    const hubR = token("--node-hub") / 2;
+    const r0 = hubR + 28;
+    const pos: Record<string, P> = {};
+    const hubOf: Record<string, string> = {};
+    const hubs = sources.map((s, i) => {
+      const a = HUB_ANGLES[i] * RAD;
+      const dir = { x: Math.cos(a), y: Math.sin(a) };
+      const p = { x: center.x + rx * dir.x, y: center.y + ry * dir.y };
+      const flagged = s.items.filter((it) => onGraph(it, state));
+      const step = Math.min(FLAG_STEP, FLAG_ARC / Math.max(flagged.length - 1, 1));
+      flagged.forEach((it, k) => {
+        const t = a + (k - (flagged.length - 1) / 2) * step * RAD;
+        const r = r0 + Math.floor(k / 8) * 28 + (flagged.length > 4 && k % 2 ? token("--space-5") : 0);
+        pos[it.id] = { x: p.x + r * Math.cos(t), y: p.y + r * Math.sin(t) };
+        hubOf[it.id] = s.id;
+      });
+      return { s, p, dir };
+    });
+    return { center, hubs, pos, hubOf, hubR, ring: r0 };
+  }, [size, sources, state]);
+
+  const toneOfItem = (it: Item) => {
+    const st = liveStatus(it, state);
+    return st === "raised" ? "flag" : st === "asked" ? "accent" : undefined;
+  };
+  const raisedIn = (s: Source) => s.items.filter((it) => toneOfItem(it) === "flag").length;
+  const toneOfHub = (s: Source) => (!s.collected ? "empty" : s.items.some((it) => toneOfItem(it) === "flag") ? "flag" : undefined);
+
+  const focus = useMemo(() => {
+    if (!hot) return null;
+    const set = new Set<string>();
+    if (hot.kind === "hub") {
+      set.add(hubKey(hot.id));
+      sources.find((s) => s.id === hot.id)?.items.forEach((it) => {
+        if (layout.pos[it.id]) set.add(it.id);
+      });
+      return set;
+    }
+    const item = sources.flatMap((s) => s.items).find((it) => it.id === hot.id);
+    if (!item) return set;
+    const story = findingOf(item)?.story;
+    set.add(item.id);
+    links.forEach((l) => {
+      if (story ? l.story === story : l.a === item.id || l.b === item.id) {
+        set.add(l.a);
+        set.add(l.b);
+      }
+    });
+    if (story) findings.filter((f) => f.story === story).forEach((f) => set.add(f.itemId));
+    [...set].forEach((id) => layout.hubOf[id] && set.add(hubKey(layout.hubOf[id])));
+    return set;
+  }, [hot, layout, links, findings, sources]);
+
+  const labelled = useMemo(() => {
+    const raised = findings.filter((f) => state[f.id]?.status === "raised").slice(0, raisedShown);
+    return new Set([...raised.map((f) => f.id), ...findings.filter((f) => state[f.id]?.status === "asked").map((f) => f.id)]);
+  }, [state, findings]);
+
+  const labels = useMemo(() => {
+    const gap = token("--label-gap");
+    const rowH = token("--control-s") + token("--space-1");
+    const edge = token("--space-4");
+    type Side = "left" | "right" | "up" | "down";
+    const list = layout.hubs.flatMap(({ s, p }) =>
+      s.items
+        .filter((it) => !!it.findingId && labelled.has(it.findingId) && layout.pos[it.id])
+        .flatMap((it) => {
+          const f = findingOf(it);
+          const q = layout.pos[it.id];
+          if (!f || !q || !categories[f.category]) return [];
+          const width = (categories[f.category].name.length + f.value.length) * 6.6 + 64;
+          const fitsRight = q.x + gap + width < size.w - edge;
+          const fitsLeft = q.x - gap - width > edge;
+          const prefer: Side = q.x < p.x ? "left" : "right";
+          const side: Side = prefer === "right" ? (fitsRight ? "right" : q.y < p.y ? "up" : "down") : fitsLeft ? "left" : q.y < p.y ? "up" : "down";
+          const cx = Math.min(Math.max(q.x, edge + width / 2), size.w - edge - width / 2);
+          const x0 = side === "right" ? q.x + gap : side === "left" ? q.x - gap - width : cx - width / 2;
+          const y = side === "up" ? q.y - gap : side === "down" ? q.y + gap : q.y;
+          return [{ it, f, q, side, width, x0, cx, y }];
+        }),
+    );
+    const sorted = list.filter((l) => l.side === "left" || l.side === "right").sort((a, b) => a.y - b.y);
+    sorted.forEach((l, i) => {
+      l.y = Math.max(l.y, edge + rowH / 2);
+      for (let j = 0; j < i; j++) {
+        const o = sorted[j];
+        const overlapX = l.x0 < o.x0 + o.width && o.x0 < l.x0 + l.width;
+        if (overlapX && Math.abs(l.y - o.y) < rowH) l.y = o.y + rowH;
+      }
+    });
+    return list;
+  }, [layout, labelled, size.w]);
+
+  const dim = (id: string) => (focus ? !focus.has(id) : false);
+  const edgeDim = (a: string, b: string) => (focus ? !(focus.has(a) && focus.has(b)) : false);
+
+  const enterItem = (it: Item) => {
+    setHot({ kind: "item", id: it.id });
+    const f = findingOf(it);
+    const p = layout.pos[it.id];
+    if (!p) return;
+    if (!f || toneOfItem(it) === undefined) setTip({ x: p.x, y: p.y, title: it.name, sub: it.detail });
+    else if (!labelled.has(f.id) && categories[f.category]) setTip({ x: p.x, y: p.y, title: categories[f.category].name, sub: f.value });
+  };
+  const leave = () => {
+    setHot(null);
+    setTip(null);
+  };
+  const clickItem = (s: Source, it: Item) => {
+    if (movedRef.current) return;
+    const f = findingOf(it);
+    if (f && state[f.id]?.status !== "cleared") onFinding(f);
+    else onItem(s, it.id);
+  };
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    movedRef.current = false;
+    const t = e.target as HTMLElement;
+    if (t.closest("button, .wipe, a, input, textarea")) return;
+    const cur = viewRef.current;
+    dragRef.current = { px: e.clientX, py: e.clientY, vx: cur.x, vy: cur.y };
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.px;
+    const dy = e.clientY - drag.py;
+    if (Math.hypot(dx, dy) > 4) movedRef.current = true;
+    applyView({ x: drag.vx + dx, y: drag.vy + dy, k: viewRef.current.k });
+  };
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    dragRef.current = null;
+    setDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    requestAnimationFrame(() => {
+      movedRef.current = false;
+    });
+  };
+  const onDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement;
+    if (t.closest("button, .wipe, a, circle.item")) return;
+    applyView(IDENTITY);
+  };
+
+  const ready = size.w > 0;
+  const { center, hubs, pos, hubR } = layout;
+  const shownTip = tip ?? lastTip;
+
+  return (
+    <div
+      className="graph"
+      ref={ref}
+      data-drag={dragging}
+      style={{
+        backgroundSize: `${GRID * view.k}px ${GRID * view.k}px`,
+        backgroundPosition: `${view.x}px ${view.y}px`,
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onDoubleClick={onDoubleClick}
+    >
+      {ready && (
+        <div className="graph__world" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})` }}>
+          <svg className="graph__svg" width={size.w} height={size.h} aria-hidden>
+            {hubs.map(({ s, p }) => (
+              <line key={`spine-${s.id}`} className="edge edge--spine" x1={center.x} y1={center.y} x2={p.x} y2={p.y} data-tone={s.collected ? undefined : "empty"} data-hot={hot?.kind === "hub" && hot.id === s.id} data-dim={dim(hubKey(s.id))} />
+            ))}
+            {hubs.map(({ s, p }) =>
+              s.items.filter((it) => pos[it.id]).map((it) => (
+                <line key={`e-${it.id}`} className="edge" x1={p.x} y1={p.y} x2={pos[it.id].x} y2={pos[it.id].y} data-tone={toneOfItem(it)} data-dim={edgeDim(hubKey(s.id), it.id)} />
+              )),
+            )}
+            {links.map((l) => {
+              const a = pos[l.a];
+              const b = pos[l.b];
+              if (!a || !b) return null;
+              const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+              const c = { x: mid.x + (center.x - mid.x) * 0.45, y: mid.y + (center.y - mid.y) * 0.45 };
+              const raised = [l.a, l.b].some((id) => {
+                const it = sources.flatMap((s) => s.items).find((x) => x.id === id);
+                return it ? toneOfItem(it) === "flag" : false;
+              });
+              return <path key={`${l.a}-${l.b}`} className="edge edge--link" d={`M${a.x} ${a.y} Q${c.x} ${c.y} ${b.x} ${b.y}`} data-tone={l.story && raised ? "flag" : undefined} data-dim={edgeDim(l.a, l.b)} />;
+            })}
+            {hubs.filter(({ s }) => !s.collected).map(({ s, p }) => (
+              <circle key={`ring-${s.id}`} className="ring" cx={p.x} cy={p.y} r={layout.ring} data-dim={dim(hubKey(s.id))} />
+            ))}
+            {hubs.map(({ s }) =>
+              s.items.filter((it) => pos[it.id]).map((it) => {
+                const tone = toneOfItem(it);
+                const r = tone ? token("--node-flag") : token("--node-item");
+                return (
+                  <circle
+                    key={`n-${it.id}`}
+                    className="item"
+                    cx={pos[it.id].x}
+                    cy={pos[it.id].y}
+                    r={r}
+                    data-tone={tone}
+                    data-hot={hot?.id === it.id}
+                    data-dim={dim(it.id)}
+                    onMouseEnter={() => enterItem(it)}
+                    onMouseLeave={leave}
+                    onClick={() => clickItem(s, it)}
+                  />
+                );
+              }),
+            )}
+          </svg>
+
+          <div className="node node--root" style={{ left: center.x, top: center.y }}>
+            <Icon name="laptop" />
+          </div>
+          <div className="label" style={{ left: center.x, top: center.y + token("--node-root") / 2 + 6, transform: "translateX(-50%)", textAlign: "center" }}>
+            <span className="label__name">{host.name}</span>
+            <span className="label__sub">
+              {host.os} · as {host.user}
+            </span>
+          </div>
+
+          {hubs.map(({ s, p, dir }) => {
+            const inward = { x: -dir.x, y: -dir.y };
+            const at = { left: p.x + inward.x * (hubR + 2), top: p.y + inward.y * (hubR + 2) };
+            return (
+              <div key={`hub-${s.id}`} style={{ display: "contents" }}>
+                <button
+                  className="node node--hub"
+                  style={{ left: p.x, top: p.y }}
+                  data-tone={toneOfHub(s)}
+                  data-hot={hot?.kind === "hub" && hot.id === s.id}
+                  data-dim={dim(hubKey(s.id))}
+                  aria-label={s.name}
+                  onMouseEnter={() => {
+                    setHot({ kind: "hub", id: s.id });
+                    setTip({ x: p.x, y: p.y - hubR, title: s.name, sub: s.looksAt });
+                  }}
+                  onMouseLeave={leave}
+                  onClick={() => {
+                    if (movedRef.current) return;
+                    onSource(s);
+                  }}
+                >
+                  <Icon name={s.icon} />
+                  {raisedIn(s) > 0 && <span className="hub-badge num">{raisedIn(s)}</span>}
+                </button>
+                <div className="label" style={{ ...at, ...anchor(inward, 8) }} data-dim={dim(hubKey(s.id))}>
+                  <span className="label__name">
+                    {s.name} {s.collected && <span className="muted num">{s.items.length}</span>}
+                  </span>
+                  <span className="label__sub">{s.collected ? s.tileFeed : shortWhy[s.id]}</span>
+                </div>
+              </div>
+            );
+          })}
+
+          <svg className="graph__svg graph__svg--over" width={size.w} height={size.h} aria-hidden>
+            {labels.map((l) => (
+              <line key={`ld-${l.it.id}`} className="leader" data-tone={toneOfItem(l.it)} data-dim={dim(l.it.id)} x1={l.q.x} y1={l.q.y} x2={l.side === "right" ? l.q.x + token("--label-gap") : l.side === "left" ? l.q.x - token("--label-gap") : l.q.x} y2={l.y} />
+            ))}
+          </svg>
+          {labels.map((l) => (
+            <div key={`fl-${l.it.id}`} className="flag-label" data-tone={toneOfItem(l.it)} data-dim={dim(l.it.id)} style={labelStyle(l)}>
+              <Wipe tone="flag" size="s" onClick={() => onFinding(l.f)} onMouseEnter={() => setHot({ kind: "item", id: l.it.id })} onMouseLeave={leave}>
+                <span className="cat-tile cat-tile--s" data-cat={categories[l.f.category].color}>
+                  <Icon name={toneOfItem(l.it) === "accent" ? "agent" : categories[l.f.category].icon} />
+                </span>
+                {categories[l.f.category].name}
+                <span className="flag-label__rest">{l.f.value}</span>
+              </Wipe>
+            </div>
+          ))}
+
+          <div className="tip" data-open={!!tip} style={{ left: shownTip?.x, top: shownTip?.y }}>
+            <span className="t-strong">{shownTip?.title}</span>
+            <span>{shownTip?.sub}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="graph__foot">
+        <p className="graph__honest">
+          A snapshot of what a normal user can list. Short-lived programs are invisible. Firewall, device policy, and kernel telemetry are not on this picture, because this agent cannot see them. This page does not know if a file is malicious.
+        </p>
+        <div className="legend">
+          <span>
+            <span className="dot" /> Raised
+          </span>
+          <span>
+            <span className="dot dot--accent" /> With your agent
+          </span>
+          <span>
+            <span className="dot dot--quiet" /> On the surface
+          </span>
+          <span>
+            <span className="ring-dot" /> Not collected
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}

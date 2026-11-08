@@ -1,0 +1,147 @@
+@import "@fontsource-variable/inter";
+
+:root {
+  /* Primitives. Nothing outside this file uses a raw color, size, or duration. */
+  --blue-700: #0b259e;
+  --blue-600: #1238d6;
+  --blue-400: #6f8bff;
+  --blue-100: #e9eeff;
+  --orange-600: #c94a07;
+  --orange-500: #f5641a;
+  --orange-100: #fff0e6;
+  --ink-950: #0f1014;
+  --ink-900: #16171c;
+  --ink-800: #1f2127;
+  --ink-700: #2a2d35;
+  --ink-600: #373a44;
+  --ink-400: #8b8f9b;
+  --ink-300: #b4b7c0;
+  --grey-600: #5f636e;
+  --grey-300: #c9ccd4;
+  --red-500: #ff2d46;
+  --yellow-500: #ffd400;
+  --green-500: #00d65f;
+  --cyan-500: #00c8ff;
+  --purple-500: #7a3cff;
+  --magenta-500: #f72fd0;
+  --mist-300: #dfe1e6;
+  --mist-200: #ebedf0;
+  --mist-100: #f5f6f8;
+  --white: #ffffff;
+
+  /* Semantic color */
+  --bg: var(--white);
+  --fg: var(--ink-900);
+  --fg-muted: var(--grey-600);
+  --fg-faint: var(--grey-300);
+  --fill: var(--mist-100);
+  --fill-strong: var(--mist-200);
+  --hairline: var(--mist-300);
+  --accent: var(--blue-600);
+  --accent-strong: var(--blue-700);
+  --accent-soft: var(--blue-100);
+  --accent-on-dark: var(--blue-400);
+  --on-accent: var(--white);
+  --flag: var(--orange-500);
+  --flag-strong: var(--orange-600);
+  --flag-soft: var(--orange-100);
+  --on-flag: var(--white);
+  --nav: var(--ink-900);
+  --nav-hover: var(--ink-700);
+  --nav-active: var(--ink-600);
+  --nav-fg: var(--white);
+  --nav-muted: var(--ink-400);
+  --scrim: rgb(15 16 20 / 0.45);
+
+  /* Category labels: the rainbow minus orange, which only ever means raised. Icons on them are charcoal. */
+  --cat-red: var(--red-500);
+  --cat-yellow: var(--yellow-500);
+  --cat-green: var(--green-500);
+  --cat-cyan: var(--cyan-500);
+  --cat-purple: var(--purple-500);
+  --cat-magenta: var(--magenta-500);
+  --on-cat: var(--ink-900);
+  --on-cat-nav: var(--white);
+  /* Type: one family, bold by default */
+  --font: "Inter Variable", system-ui, sans-serif;
+  --weight-body: 500;
+  --weight-strong: 600;
+  --weight-display: 700;
+  --text-xs: 12px;
+  --text-s: 13px;
+  --text-m: 14px;
+  --text-l: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --leading-tight: 1.2;
+  --leading-body: 1.5;
+  --tracking-display: -0.02em;
+  --tracking-body: -0.006em;
+
+  /* Space and shape */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  /* Everything is square. Only things that are round by meaning (dots, graph nodes, count badges) use --radius-circle. */
+  --radius-s: 0;
+  --radius-m: 0;
+  --radius-l: 0;
+  --radius-circle: 999px;
+  --line: 1.5px;
+  --dot: 8px;
+
+  /* Sizes */
+  --control: 36px;
+  --control-s: 28px;
+  --icon: 16px;
+  --icon-box: 32px;
+  --nav-w: 320px;
+  --bar-h: 60px;
+  --sheet-w: 700px;
+  --dialog-w: 1100px;
+  --dialog-w-m: 820px;
+  --dialog-w-fixed: 760px;
+  --dialog-h-fixed: 640px;
+  --dialog-w-s: 620px;
+  --stock-cell: 8px;
+  --toggle-w: 36px;
+  --toggle-h: 20px;
+  --badge: 20px;
+  --cat-tile: 28px;
+  --cat-tile-s: 20px;
+
+  /* Graph */
+  --node-root: 72px;
+  --node-hub: 52px;
+  --node-item: 4px;
+  --node-flag: 7px;
+  --graph-grid: 24px;
+  --label-gap: 14px;
+
+  /* Motion: three durations for response, two for pacing, two curves. */
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 380ms;
+  --dur-stagger: 900ms;
+  --dur-hold: 1600ms;
+  --dur-toast: 4200ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-move: cubic-bezier(0.65, 0, 0.35, 1);
+  --press: 0.97;
+  --grow: 1.12;
+
+  --elev-overlay: 0 1px 2px rgb(15 16 20 / 0.08), 0 16px 48px rgb(15 16 20 / 0.18);
+  --elev-float: 0 1px 2px rgb(15 16 20 / 0.1), 0 6px 20px rgb(15 16 20 / 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+  }
+}

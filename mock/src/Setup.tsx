@@ -1,0 +1,132 @@
+import { useState } from "react";
+import { access, filesPrompt, sentence, skillBody, store } from "./data";
+import { openPrivacy } from "./api";
+import { useSurface } from "./surface";
+import { Icon, Toggle, Wipe } from "./ui";
+
+export function AgentPicks({ agentIds, onAgents }: { agentIds: string[]; onAgents: (ids: string[]) => void }) {
+  const { agents } = useSurface();
+  return (
+    <div className="agents">
+      {agents.map((a) => (
+        <label key={a.id} className="agent-pick">
+          <span className="agent-pick__name">
+            {a.name}
+            <span className="agent-pick__where">{a.found ? `Found ${a.found}` : "Not on this laptop"}</span>
+          </span>
+          <Toggle
+            on={agentIds.includes(a.id)}
+            label={a.name}
+            onChange={(v) => onAgents(v ? [...agentIds, a.id] : agentIds.filter((id) => id !== a.id))}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
+export function Device() {
+  const { host } = useSurface();
+  return (
+    <div className="device">
+      <span className="icon-box" data-tone="accent">
+        <Icon name="laptop" />
+      </span>
+      <span className="device__text">
+        <span className="t-strong">{host.name}</span>
+        <span className="muted t-small">
+          {host.os} · as {host.user} · read from this Mac
+        </span>
+      </span>
+    </div>
+  );
+}
+
+export function AccessList() {
+  const [opened, setOpened] = useState<string[]>([]);
+  const { filesOn, setFilesOn, sources } = useSurface();
+  return (
+    <div className="access">
+      {sources
+        .filter((s) => s.collected && !s.optIn)
+        .map((s) => (
+          <div key={s.id} className="access__row">
+            <Icon name={s.icon} />
+            <span className="access__text">
+              <span className="t-strong">{s.name}</span>
+            </span>
+            <span className="access__state" data-on="true">
+              <Icon name="check" />
+              Seen as you
+            </span>
+          </div>
+        ))}
+      <div className="access__row">
+        <Icon name="file" />
+        <span className="access__text">
+          <span className="t-strong">New files</span>
+          <span className="muted t-small">{filesOn ? "On. Downloads, Desktop, and /tmp, names only." : filesPrompt}</span>
+        </span>
+        <Toggle on={filesOn} label="New files" onChange={setFilesOn} />
+      </div>
+      {access.map((a) => (
+        <div key={a.id} className="access__row">
+          <Icon name="lock" />
+          <span className="access__text">
+            <span className="t-strong">{a.unlocks}</span>
+            <span className="muted t-small">{a.how === "settings" ? `Needs ${a.name}. You turn it on in ${a.where}.` : a.where}</span>
+          </span>
+          {a.how === "settings" ? (
+            <Wipe
+              tone="quiet"
+              size="s"
+              done={opened.includes(a.id)}
+              onClick={() => {
+                setOpened([...opened, a.id]);
+                void openPrivacy("fda").catch(() => {});
+              }}
+            >
+              <Icon name={opened.includes(a.id) ? "check" : "arrow"} />
+              {opened.includes(a.id) ? "Waiting for the switch" : "Open System Settings"}
+            </Wipe>
+          ) : (
+            <span className="access__state">Not in v1</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function SkillPreview({ agentIds }: { agentIds: string[] }) {
+  const { agents } = useSurface();
+  const chosen = agents.filter((a) => agentIds.includes(a.id));
+  return (
+    <div>
+      {chosen
+        .filter((a) => a.always)
+        .map((a) => (
+          <div key={a.id} className="preview">
+            <span className="preview__file">{a.always}</span>
+            <span>{"<!-- edward:start -->"}</span>
+            <span>
+              {sentence} Its page is on port {store.port}, and its skill is at {a.skill}.
+            </span>
+            <span>{"<!-- edward:end -->"}</span>
+          </div>
+        ))}
+      {chosen.length > 0 && (
+        <div className="preview">
+          {chosen.map((a) => (
+            <span key={a.id} className="preview__file">
+              {a.skill}
+            </span>
+          ))}
+          {skillBody.map((line, i) => (
+            <span key={i}>{line}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://edward.local/schema/store.json",
+  "title": "EDwaRd store",
+  "description": "One JSON file. The collector writes it. The page and the agent read it. Do not add fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "writtenAt",
+    "paused",
+    "filesOn",
+    "filesGrant",
+    "firstRunDone",
+    "host",
+    "agentNotes",
+    "hookedAgents",
+    "agents",
+    "sources",
+    "findings",
+    "states",
+    "dismissals",
+    "links",
+    "baseline"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "writtenAt": { "type": "string", "format": "date-time" },
+    "paused": { "type": "boolean" },
+    "filesOn": { "type": "boolean" },
+    "filesGrant": {
+      "enum": ["off", "prompting", "allowed", "denied"],
+      "description": "off: toggle is off, folders not listed. prompting: toggle on, waiting for macOS Allow. allowed: both Downloads and Desktop readable. denied: user chose Don't Allow or listing failed."
+    },
+    "firstRunDone": { "type": "boolean" },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "os", "user"],
+      "properties": {
+        "name": { "type": "string" },
+        "os": { "type": "string" },
+        "user": { "type": "string" }
+      }
+    },
+    "agentNotes": { "type": "string" },
+    "hookedAgents": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/agentId" }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/agent" }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "states": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/findingState" }
+    },
+    "dismissals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dismissal" }
+    },
+    "links": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/link" }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startupIds", "fileIds"],
+      "properties": {
+        "startupIds": { "type": "array", "items": { "type": "string" } },
+        "fileIds": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "agentId": {
+      "enum": ["claude", "cursor", "codex", "openclaw"]
+    },
+    "sourceId": {
+      "enum": ["processes", "connections", "files", "apps", "startup", "firewall", "policy", "logs"]
+    },
+    "iconName": {
+      "enum": [
+        "process",
+        "network",
+        "file",
+        "apps",
+        "startup",
+        "shield",
+        "policy",
+        "logs"
+      ]
+    },
+    "categoryId": {
+      "enum": ["exposed", "unknownAddress", "hidden", "disguised", "login", "unsigned"]
+    },
+    "pair": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "string" }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "found", "always", "skill"],
+      "properties": {
+        "id": { "$ref": "#/$defs/agentId" },
+        "name": { "type": "string" },
+        "found": { "type": ["string", "null"] },
+        "always": { "type": ["string", "null"] },
+        "skill": { "type": "string" }
+      }
+    },
+    "empty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["why", "wouldShow", "yourself"],
+      "properties": {
+        "why": { "type": "string" },
+        "wouldShow": { "type": "string" },
+        "yourself": { "type": "string" }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "detail", "meta", "facts"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "detail": { "type": "string" },
+        "meta": { "type": "string" },
+        "facts": { "type": "array", "items": { "$ref": "#/$defs/pair" } },
+        "findingId": { "type": "string" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "icon",
+        "collected",
+        "looksAt",
+        "feed",
+        "tileFeed",
+        "items"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/sourceId" },
+        "name": { "type": "string" },
+        "icon": { "$ref": "#/$defs/iconName" },
+        "collected": { "type": "boolean" },
+        "optIn": { "type": "boolean" },
+        "looksAt": { "type": "string" },
+        "feed": { "type": "string" },
+        "tileFeed": { "type": "string" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "empty": { "$ref": "#/$defs/empty" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source",
+        "itemId",
+        "category",
+        "subject",
+        "value",
+        "facts",
+        "chain",
+        "quoted"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "source": { "$ref": "#/$defs/sourceId" },
+        "itemId": { "type": "string" },
+        "category": { "$ref": "#/$defs/categoryId" },
+        "subject": { "type": "string" },
+        "value": { "type": "string" },
+        "facts": { "type": "array", "items": { "type": "string" } },
+        "chain": { "type": "array", "items": { "type": "string" } },
+        "quoted": { "type": "array", "items": { "$ref": "#/$defs/pair" } }
+      }
+    },
+    "findingState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["raised", "cleared", "asked"] },
+        "note": { "type": "string" }
+      }
+    },
+    "dismissal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "path|port|user for listeners and connections. path|user for other findings."
+        }
+      }
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["a", "b"],
+      "properties": {
+        "a": { "type": "string" },
+        "b": { "type": "string" }
+      }
+    }
+  }
+}
