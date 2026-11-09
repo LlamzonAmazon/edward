@@ -511,6 +511,15 @@ export const agents: Agent[] = [
   { id: "claude", name: "Claude Code", found: "~/.claude", always: "~/.claude/CLAUDE.md", skill: "~/.claude/skills/edward/SKILL.md" },
   { id: "cursor", name: "Cursor", found: "~/.cursor", always: null, skill: "~/.cursor/skills/edward/SKILL.md" },
   { id: "codex", name: "Codex", found: null, always: "~/.codex/AGENTS.md", skill: "~/.codex/skills/edward/SKILL.md" },
+  { id: "hermes", name: "Hermes", found: "~/.hermes", always: null, skill: "~/.hermes/skills/edward/SKILL.md" },
+  { id: "windsurf", name: "Windsurf", found: "~/.windsurf", always: null, skill: "~/.codeium/windsurf/skills/edward/SKILL.md" },
+  { id: "copilot", name: "GitHub Copilot", found: "~/.copilot", always: null, skill: "~/.copilot/skills/edward/SKILL.md" },
+  { id: "gemini", name: "Gemini CLI", found: "~/.gemini", always: null, skill: "~/.gemini/skills/edward/SKILL.md" },
+  { id: "cline", name: "Cline", found: "~/.agents", always: null, skill: "~/.agents/skills/edward/SKILL.md" },
+  { id: "opencode", name: "OpenCode", found: null, always: null, skill: "~/.config/opencode/skills/edward/SKILL.md" },
+  { id: "amp", name: "Amp", found: null, always: null, skill: "~/.config/agents/skills/edward/SKILL.md" },
+  { id: "roo", name: "Roo Code", found: null, always: null, skill: "~/.roo/skills/edward/SKILL.md" },
+  { id: "kiro", name: "Kiro", found: null, always: null, skill: "~/.kiro/skills/edward/SKILL.md" },
   { id: "openclaw", name: "OpenClaw", found: null, always: null, skill: "~/.openclaw/skills/edward/SKILL.md" },
 ];
 

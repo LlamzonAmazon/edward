@@ -131,6 +131,15 @@ func DefaultAgents() []Agent {
 		{ID: "claude", Name: "Claude Code", Found: nil, Always: &alwaysClaude, Skill: "~/.claude/skills/edward/SKILL.md"},
 		{ID: "cursor", Name: "Cursor", Found: nil, Always: nil, Skill: "~/.cursor/skills/edward/SKILL.md"},
 		{ID: "codex", Name: "Codex", Found: nil, Always: &alwaysCodex, Skill: "~/.codex/skills/edward/SKILL.md"},
+		{ID: "hermes", Name: "Hermes", Found: nil, Always: nil, Skill: "~/.hermes/skills/edward/SKILL.md"},
+		{ID: "windsurf", Name: "Windsurf", Found: nil, Always: nil, Skill: "~/.codeium/windsurf/skills/edward/SKILL.md"},
+		{ID: "copilot", Name: "GitHub Copilot", Found: nil, Always: nil, Skill: "~/.copilot/skills/edward/SKILL.md"},
+		{ID: "gemini", Name: "Gemini CLI", Found: nil, Always: nil, Skill: "~/.gemini/skills/edward/SKILL.md"},
+		{ID: "cline", Name: "Cline", Found: nil, Always: nil, Skill: "~/.agents/skills/edward/SKILL.md"},
+		{ID: "opencode", Name: "OpenCode", Found: nil, Always: nil, Skill: "~/.config/opencode/skills/edward/SKILL.md"},
+		{ID: "amp", Name: "Amp", Found: nil, Always: nil, Skill: "~/.config/agents/skills/edward/SKILL.md"},
+		{ID: "roo", Name: "Roo Code", Found: nil, Always: nil, Skill: "~/.roo/skills/edward/SKILL.md"},
+		{ID: "kiro", Name: "Kiro", Found: nil, Always: nil, Skill: "~/.kiro/skills/edward/SKILL.md"},
 		{ID: "openclaw", Name: "OpenClaw", Found: nil, Always: nil, Skill: "~/.openclaw/skills/edward/SKILL.md"},
 	}
 }

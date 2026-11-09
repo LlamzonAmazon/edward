@@ -59,7 +59,7 @@ func TestRoundTripRequiredFields(t *testing.T) {
 	if len(loaded.Sources) != 8 {
 		t.Fatalf("sources %d", len(loaded.Sources))
 	}
-	if len(loaded.Agents) != 4 {
+	if len(loaded.Agents) != 13 {
 		t.Fatalf("agents %d", len(loaded.Agents))
 	}
 }

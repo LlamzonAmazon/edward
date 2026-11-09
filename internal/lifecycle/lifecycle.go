@@ -52,6 +52,15 @@ func skillDirs(home string) []string {
 		filepath.Join(home, ".cursor", "skills", "edward"),
 		filepath.Join(home, ".claude", "skills", "edward"),
 		filepath.Join(home, ".codex", "skills", "edward"),
+		filepath.Join(home, ".hermes", "skills", "edward"),
+		filepath.Join(home, ".codeium", "windsurf", "skills", "edward"),
+		filepath.Join(home, ".copilot", "skills", "edward"),
+		filepath.Join(home, ".gemini", "skills", "edward"),
+		filepath.Join(home, ".agents", "skills", "edward"),
+		filepath.Join(home, ".config", "opencode", "skills", "edward"),
+		filepath.Join(home, ".config", "agents", "skills", "edward"),
+		filepath.Join(home, ".roo", "skills", "edward"),
+		filepath.Join(home, ".kiro", "skills", "edward"),
 		filepath.Join(home, ".openclaw", "skills", "edward"),
 	}
 }

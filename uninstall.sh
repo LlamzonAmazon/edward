@@ -243,6 +243,15 @@ for d in \
 	"$HOME/.cursor/skills/edward" \
 	"$HOME/.claude/skills/edward" \
 	"$HOME/.codex/skills/edward" \
+	"$HOME/.hermes/skills/edward" \
+	"$HOME/.codeium/windsurf/skills/edward" \
+	"$HOME/.copilot/skills/edward" \
+	"$HOME/.gemini/skills/edward" \
+	"$HOME/.agents/skills/edward" \
+	"$HOME/.config/opencode/skills/edward" \
+	"$HOME/.config/agents/skills/edward" \
+	"$HOME/.roo/skills/edward" \
+	"$HOME/.kiro/skills/edward" \
 	"$HOME/.openclaw/skills/edward"; do
 	remove_path "$d" || true
 done
@@ -286,6 +295,15 @@ for p in \
 	"$HOME/.cursor/skills/edward" \
 	"$HOME/.claude/skills/edward" \
 	"$HOME/.codex/skills/edward" \
+	"$HOME/.hermes/skills/edward" \
+	"$HOME/.codeium/windsurf/skills/edward" \
+	"$HOME/.copilot/skills/edward" \
+	"$HOME/.gemini/skills/edward" \
+	"$HOME/.agents/skills/edward" \
+	"$HOME/.config/opencode/skills/edward" \
+	"$HOME/.config/agents/skills/edward" \
+	"$HOME/.roo/skills/edward" \
+	"$HOME/.kiro/skills/edward" \
 	"$HOME/.openclaw/skills/edward"; do
 	if [ -e "$p" ] || [ -L "$p" ]; then
 		rm -rf "$p" 2>/dev/null || true
@@ -317,6 +335,15 @@ verify_absent "$APPDIR"
 verify_absent "$HOME/.cursor/skills/edward"
 verify_absent "$HOME/.claude/skills/edward"
 verify_absent "$HOME/.codex/skills/edward"
+verify_absent "$HOME/.hermes/skills/edward"
+verify_absent "$HOME/.codeium/windsurf/skills/edward"
+verify_absent "$HOME/.copilot/skills/edward"
+verify_absent "$HOME/.gemini/skills/edward"
+verify_absent "$HOME/.agents/skills/edward"
+verify_absent "$HOME/.config/opencode/skills/edward"
+verify_absent "$HOME/.config/agents/skills/edward"
+verify_absent "$HOME/.roo/skills/edward"
+verify_absent "$HOME/.kiro/skills/edward"
 verify_absent "$HOME/.openclaw/skills/edward"
 if [ -L "$LINK" ]; then
 	target=$(readlink "$LINK" 2>/dev/null || true)

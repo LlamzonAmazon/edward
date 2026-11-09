@@ -55,7 +55,7 @@ Read [install.sh](install.sh) before you run it if you want the exact file paths
 
 ### After install
 
-The first-run page can write a skill for the agents you pick (Cursor, Claude Code, Codex, OpenClaw). Default is to ask first. Skip leaves the page working and writes no agent file.
+The first-run page can write a skill for the agents you pick. Default is to ask first. Skip leaves the page working and writes no agent file.
 
 <p align="center">
   <img src="media/mock/readme-first-run.png" alt="First-run agent picker on fixture data" width="900" />
@@ -63,12 +63,23 @@ The first-run page can write a skill for the agents you pick (Cursor, Claude Cod
 
 If you accept, it may write:
 
-- Cursor: `~/.cursor/skills/edward/SKILL.md` only
-- Claude Code: `~/.claude/CLAUDE.md` (sentinel block) and `~/.claude/skills/edward/SKILL.md` <!-- repo-leak:ok EDwaRd skill install path -->
-- Codex: `~/.codex/AGENTS.md` (sentinel block) and `~/.codex/skills/edward/SKILL.md`
-- OpenClaw: `~/.openclaw/skills/edward/SKILL.md` only
+| Agent | Always-on sentence | Skill |
+| --- | --- | --- |
+| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills/edward/SKILL.md` <!-- repo-leak:ok EDwaRd skill install path --> |
+| Cursor | none | `~/.cursor/skills/edward/SKILL.md` |
+| Codex | `~/.codex/AGENTS.md` | `~/.codex/skills/edward/SKILL.md` |
+| Hermes | none | `~/.hermes/skills/edward/SKILL.md` |
+| Windsurf | none | `~/.codeium/windsurf/skills/edward/SKILL.md` |
+| GitHub Copilot | none | `~/.copilot/skills/edward/SKILL.md` |
+| Gemini CLI | none | `~/.gemini/skills/edward/SKILL.md` |
+| Cline | none | `~/.agents/skills/edward/SKILL.md` (also used by Warp, Zed, and other CLIs that read `~/.agents/skills`) |
+| OpenCode | none | `~/.config/opencode/skills/edward/SKILL.md` |
+| Amp | none | `~/.config/agents/skills/edward/SKILL.md` |
+| Roo Code | none | `~/.roo/skills/edward/SKILL.md` |
+| Kiro | none | `~/.kiro/skills/edward/SKILL.md` |
+| OpenClaw | none | `~/.openclaw/skills/edward/SKILL.md` |
 
-It does not write project `CLAUDE.md`, project `AGENTS.md`, or `.cursor/rules`.
+It does not write project `CLAUDE.md`, project `AGENTS.md`, Hermes `SOUL.md`, or `.cursor/rules`.
 
 ### Reinstall after a code change
 
@@ -171,6 +182,15 @@ test ! -e ~/.local/bin/edward
 test ! -d ~/.cursor/skills/edward
 test ! -d ~/.claude/skills/edward  # repo-leak:ok EDwaRd skill path
 test ! -d ~/.codex/skills/edward
+test ! -d ~/.hermes/skills/edward
+test ! -d ~/.codeium/windsurf/skills/edward
+test ! -d ~/.copilot/skills/edward
+test ! -d ~/.gemini/skills/edward
+test ! -d ~/.agents/skills/edward
+test ! -d ~/.config/opencode/skills/edward
+test ! -d ~/.config/agents/skills/edward
+test ! -d ~/.roo/skills/edward
+test ! -d ~/.kiro/skills/edward
 test ! -d ~/.openclaw/skills/edward
 grep -n "edward:start\|edward:end" ~/.claude/CLAUDE.md ~/.codex/AGENTS.md  # repo-leak:ok EDwaRd sentinel
 curl -sf --max-time 2 http://127.0.0.1:43393/ ; echo "page exit $?"

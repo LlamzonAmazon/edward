@@ -126,7 +126,7 @@ I have access to EDwaRd. Its page is on port 43393, and its skill is at {skill p
 <!-- edward:end -->
 ```
 
-Cursor and OpenClaw: skill file only. No always-on file. Do not write project `CLAUDE.md` or repo `.cursor/rules`.
+Claude Code and Codex get a sentinel in their always-on file plus a skill. Everyone else is skill-only: Cursor, Hermes, Windsurf, GitHub Copilot, Gemini CLI, Cline (`~/.agents/skills`), OpenCode, Amp, Roo Code, Kiro, OpenClaw. Do not write project `CLAUDE.md`, project `AGENTS.md`, Hermes `SOUL.md`, or repo `.cursor/rules`.
 
 ## App bundle
 
@@ -155,7 +155,7 @@ LaunchAgent label `com.edward.agent`, program the MacOS binary, KeepAlive true, 
 6. If `127.0.0.1:43393` is taken before start, stop and print that.
 7. Open `http://127.0.0.1:43393` when a browser exists.
 
-`uninstall.sh`: stop by binary path, bootout and delete the plist, delete the data directory and PATH symlink, remove sentinel blocks from `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` only, delete `edward` skill directories for cursor, claude, codex, openclaw. Print one line per path: removed, already absent, or left in place. Running twice is success. <!-- repo-leak:ok EDwaRd uninstall paths -->
+`uninstall.sh`: stop by binary path, bootout and delete the plist, delete the data directory and PATH symlink, remove sentinel blocks from `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` only, delete every `edward` skill directory listed in the agent table (cursor, claude, codex, hermes, windsurf, copilot, gemini, agents, opencode, amp, roo, kiro, openclaw). Print one line per path: removed, already absent, or left in place. Running twice is success. <!-- repo-leak:ok EDwaRd uninstall paths -->
 
 `EDWARD_HOME` and `EDWARD_LAUNCH_AGENTS` override paths in tests.
 

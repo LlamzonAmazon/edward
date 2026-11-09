@@ -55,13 +55,25 @@ After turn off or delete, the page on port 43393 will not answer. Say that plain
 type spec struct {
 	id, name, dir, always, skill string
 	alwaysFile                   bool
+	// detectDirs lists home-relative folders that mean this agent is installed.
+	// Empty means use dir only.
+	detectDirs []string
 }
 
 var specs = []spec{
 	{id: "claude", name: "Claude Code", dir: ".claude", always: "~/.claude/CLAUDE.md", skill: "~/.claude/skills/edward/SKILL.md", alwaysFile: true},
-	{id: "cursor", name: "Cursor", dir: ".cursor", always: "", skill: "~/.cursor/skills/edward/SKILL.md"},
+	{id: "cursor", name: "Cursor", dir: ".cursor", skill: "~/.cursor/skills/edward/SKILL.md"},
 	{id: "codex", name: "Codex", dir: ".codex", always: "~/.codex/AGENTS.md", skill: "~/.codex/skills/edward/SKILL.md", alwaysFile: true},
-	{id: "openclaw", name: "OpenClaw", dir: ".openclaw", always: "", skill: "~/.openclaw/skills/edward/SKILL.md"},
+	{id: "hermes", name: "Hermes", dir: ".hermes", skill: "~/.hermes/skills/edward/SKILL.md"},
+	{id: "windsurf", name: "Windsurf", dir: ".windsurf", skill: "~/.codeium/windsurf/skills/edward/SKILL.md", detectDirs: []string{".windsurf", ".codeium/windsurf"}},
+	{id: "copilot", name: "GitHub Copilot", dir: ".copilot", skill: "~/.copilot/skills/edward/SKILL.md"},
+	{id: "gemini", name: "Gemini CLI", dir: ".gemini", skill: "~/.gemini/skills/edward/SKILL.md"},
+	{id: "cline", name: "Cline", dir: ".agents", skill: "~/.agents/skills/edward/SKILL.md"},
+	{id: "opencode", name: "OpenCode", dir: ".config/opencode", skill: "~/.config/opencode/skills/edward/SKILL.md"},
+	{id: "amp", name: "Amp", dir: ".config/agents", skill: "~/.config/agents/skills/edward/SKILL.md"},
+	{id: "roo", name: "Roo Code", dir: ".roo", skill: "~/.roo/skills/edward/SKILL.md"},
+	{id: "kiro", name: "Kiro", dir: ".kiro", skill: "~/.kiro/skills/edward/SKILL.md"},
+	{id: "openclaw", name: "OpenClaw", dir: ".openclaw", skill: "~/.openclaw/skills/edward/SKILL.md"},
 }
 
 func Detect(home string) []store.Agent {
@@ -72,10 +84,17 @@ func Detect(home string) []store.Agent {
 			v := s.always
 			a.Always = &v
 		}
-		p := filepath.Join(home, s.dir)
-		if st, err := os.Stat(p); err == nil && st.IsDir() {
-			tilde := "~/" + s.dir
-			a.Found = &tilde
+		dirs := s.detectDirs
+		if len(dirs) == 0 {
+			dirs = []string{s.dir}
+		}
+		for _, d := range dirs {
+			p := filepath.Join(home, d)
+			if st, err := os.Stat(p); err == nil && st.IsDir() {
+				tilde := "~/" + d
+				a.Found = &tilde
+				break
+			}
 		}
 		out = append(out, a)
 	}

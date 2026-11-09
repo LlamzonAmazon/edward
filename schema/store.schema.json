@@ -88,7 +88,21 @@
   },
   "$defs": {
     "agentId": {
-      "enum": ["claude", "cursor", "codex", "openclaw"]
+      "enum": [
+        "claude",
+        "cursor",
+        "codex",
+        "hermes",
+        "windsurf",
+        "copilot",
+        "gemini",
+        "cline",
+        "opencode",
+        "amp",
+        "roo",
+        "kiro",
+        "openclaw"
+      ]
     },
     "sourceId": {
       "enum": ["processes", "connections", "files", "apps", "startup", "firewall", "policy", "logs"]
