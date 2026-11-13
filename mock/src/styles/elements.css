@@ -282,9 +282,11 @@ dd {
 
 /* Wipe: the one hover behavior for every action that commits something.
    The label is rendered twice; the top copy is clipped in from the left edge.
-   A click changes nothing but the press scale and, for a confirmation, the
-   icon (CopyButton: copy becomes check). Labels change only for a real state
-   change (Pause and Resume), inside a Swap that reserves the widest label. */
+   A click gives two signals: the press scale (input received) and the result.
+   When the result is not visible at the button (copy, save, open another app),
+   the face wipes to a check and a past-tense label ("Copy" to "Copied"), or to
+   a failure label, inside a Swap that reserves every face, so the size and
+   color never change. */
 .wipe {
   --w-bg: var(--accent);
   --w-fg: var(--on-accent);
@@ -448,25 +450,6 @@ dd {
 }
 .swap--block .swap__reserve {
   display: block;
-}
-
-/* IconSwap: icons stacked in one cell; only the current one shows. Opacity and
-   scale are transitions, so a second change reverses mid-way. */
-.icon-swap {
-  display: inline-grid;
-  flex: none;
-}
-.icon-swap__icon {
-  grid-area: 1 / 1;
-  display: grid;
-  place-items: center;
-  opacity: 0;
-  scale: 0.6;
-  transition: opacity var(--dur-fast) var(--ease-out), scale var(--dur-fast) var(--ease-out);
-}
-.icon-swap__icon[data-on="true"] {
-  opacity: 1;
-  scale: 1;
 }
 
 .sr-only {

@@ -1,4 +1,4 @@
-import { ReactNode, TransitionEvent, isValidElement, useEffect, useRef, useState } from "react";
+import { ReactNode, TransitionEvent, isValidElement, useCallback, useEffect, useRef, useState } from "react";
 import type { IconName } from "./data";
 
 function useReducedMotion() {
@@ -279,24 +279,53 @@ type WipeProps = {
   swapKey?: string | number | boolean;
   /** Every label this button can show, so its width never changes. */
   reserve?: ReactNode[];
+  /**
+   * The result of the last click, for an action whose result is not visible at
+   * the button (copy, save, open another app). "ok" shows a check and
+   * doneLabel; "fail" shows failLabel. Both are added to reserve.
+   */
+  done?: "ok" | "fail" | null;
+  doneLabel?: ReactNode;
+  failLabel?: ReactNode;
 };
 
-export function Wipe({ tone = "accent", size = "m", block, disabled, className = "", onClick, onMouseEnter, onMouseLeave, children, label, swapKey, reserve }: WipeProps) {
+export function Wipe({ tone = "accent", size = "m", block, disabled, className = "", onClick, onMouseEnter, onMouseLeave, children, label, swapKey, reserve, done, doneLabel, failLabel = "Did not work" }: WipeProps) {
   const cls = ["wipe", `tone-${tone}`, size === "s" ? "wipe--s" : "", block ? "wipe--block" : "", className].join(" ");
+  const confirms = doneLabel !== undefined;
+  const okFace = (
+    <>
+      <Icon name="check" />
+      {doneLabel}
+    </>
+  );
+  const failFace = (
+    <>
+      <Icon name="close" />
+      {failLabel}
+    </>
+  );
+  const shown = confirms && done ? (done === "ok" ? okFace : failFace) : children;
   // The label is drawn twice (rest face and hover layer). Both Swaps get the same
   // key and reserve in the same render, so they change on the same frame.
   const face = (
-    <Swap className="wipe__face" swapKey={swapKey} reserve={reserve}>
-      {children}
+    <Swap className="wipe__face" swapKey={confirms && done ? done : swapKey} reserve={confirms ? [...(reserve ?? [children]), okFace, failFace] : reserve}>
+      {shown}
     </Swap>
   );
   return (
-    <button className={cls} disabled={disabled} onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} aria-label={label}>
-      {face}
-      <span className="wipe__layer" aria-hidden>
+    <>
+      <button className={cls} disabled={disabled} onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} aria-label={label}>
         {face}
-      </span>
-    </button>
+        <span className="wipe__layer" aria-hidden>
+          {face}
+        </span>
+      </button>
+      {confirms && (
+        <span className="sr-only" aria-live="polite">
+          {done === "ok" ? doneLabel : done === "fail" ? failLabel : ""}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -407,46 +436,42 @@ export function useEscape(onEsc: () => void, active: boolean) {
 }
 
 /**
- * Copy: on click the button presses, the copy icon becomes a check for
- * --dur-hold, then goes back. The label and size never change. Another click
- * during the hold copies again and restarts the hold.
+ * A result that shows for --dur-hold after each call. A call during the hold
+ * replaces the value and restarts the hold, so repeated clicks never queue.
  */
-export function CopyButton({ text, tone = "accent", size = "m", label = "Copy", onCopied }: { text: string; tone?: WipeProps["tone"]; size?: WipeProps["size"]; label?: string; onCopied?: () => void }) {
-  const [copied, setCopied] = useState(false);
+export function useHold<T>(): [T | null, (v: T) => void] {
+  const [value, setValue] = useState<T | null>(null);
   const timer = useRef(0);
   useEffect(() => () => window.clearTimeout(timer.current), []);
-  const click = () => {
-    navigator.clipboard?.writeText(text).catch(() => {});
-    setCopied(true);
-    onCopied?.();
+  const show = useCallback((v: T) => {
+    setValue(v);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setCopied(false), token("--dur-hold"));
-  };
-  return (
-    <Wipe tone={tone} size={size} onClick={click} swapKey="label">
-      <IconSwap name={copied ? "check" : "copy"} icons={["copy", "check"]} />
-      {label}
-      <span className="sr-only" aria-live="polite">
-        {copied ? "Copied" : ""}
-      </span>
-    </Wipe>
-  );
+    timer.current = window.setTimeout(() => setValue(null), token("--dur-hold"));
+  }, []);
+  return [value, show];
 }
 
 /**
- * An icon that changes in place (copy to check, arrow to check). Every icon in
- * `icons` sits in the same one-icon cell, so nothing moves. The old icon scales
- * out as the new one scales in, and a change mid-way reverses from where it is.
+ * Copy: on click the button presses, then the face changes from the copy icon
+ * and label to a check and "Copied" for --dur-hold. The size never changes. If
+ * the clipboard refuses, it says so instead.
  */
-export function IconSwap({ name, icons }: { name: AnyIcon; icons: AnyIcon[] }) {
+export function CopyButton({ text, tone = "accent", size = "m", label = "Copy", onCopied }: { text: string; tone?: WipeProps["tone"]; size?: WipeProps["size"]; label?: string; onCopied?: () => void }) {
+  const [result, show] = useHold<"ok" | "fail">();
+  const click = () => {
+    (navigator.clipboard?.writeText(text) ?? Promise.reject()).then(
+      () => {
+        show("ok");
+        onCopied?.();
+      },
+      () => show("fail"),
+    );
+  };
   return (
-    <span className="icon-swap">
-      {icons.map((n) => (
-        <span key={n} className="icon-swap__icon" data-on={n === name}>
-          <Icon name={n} />
-        </span>
-      ))}
-    </span>
+    <Wipe tone={tone} size={size} onClick={click} done={result} doneLabel="Copied" failLabel="Copy failed">
+      <Icon name="copy" />
+      {label}
+    </Wipe>
   );
 }
 

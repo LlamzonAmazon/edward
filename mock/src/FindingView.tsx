@@ -133,7 +133,7 @@ function Detail({ finding, st, agentNames, onClear, onAsk, onNote }: Props) {
                   <input id="note" className="field__input" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Or write your own" />
                   <div>
                     <Wipe tone={draft.trim() ? "accent" : "quiet"} size="s" disabled={!draft.trim()}>
-                      <Icon name="check" />
+                      <Icon name="arrow" />
                       Save note for {agentNames}
                     </Wipe>
                   </div>

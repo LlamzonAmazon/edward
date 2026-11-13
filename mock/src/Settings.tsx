@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { agentNames, categories, Finding } from "./data";
-import { Icon, IconSwap, Swap, Wipe } from "./ui";
+import { Icon, Swap, useHold, Wipe } from "./ui";
 import { AccessList, AgentPicks, Device } from "./Setup";
 import { useSurface } from "./surface";
 import type { FindingState } from "./App";
@@ -266,12 +266,15 @@ function AgentNotes({ agentIds, context, onContext }: Props) {
   const [draft, setDraft] = useState(context);
   useEffect(() => setDraft(context), [context]);
   const changed = draft.trim() !== context.trim();
+  const [saved, showSaved] = useHold<"ok">();
   return (
     <form
       className="section"
       onSubmit={(e) => {
         e.preventDefault();
-        if (changed) onContext(draft.trim());
+        if (!changed) return;
+        onContext(draft.trim());
+        showSaved("ok");
       }}
     >
       <p className="muted">Your agent reads these before anything EDwaRd raised. They never change what the page raises.</p>
@@ -283,8 +286,8 @@ function AgentNotes({ agentIds, context, onContext }: Props) {
         placeholder={"Port 3000 is always my dev server.\nIgnore anything in ~/scratch."}
       />
       <div>
-        <Wipe tone="accent" swapKey="save" disabled={!changed}>
-          <IconSwap name={!changed && context ? "check" : "arrow"} icons={["arrow", "check"]} />
+        <Wipe tone="accent" swapKey="save" disabled={!changed && !saved} done={saved} doneLabel={`Saved for ${agentNames(agentIds)}`}>
+          <Icon name="arrow" />
           {`Save for ${agentNames(agentIds)}`}
         </Wipe>
       </div>
@@ -297,12 +300,15 @@ function FindingNote({ finding, note, names, onNote }: { finding: Finding; note:
   const [draft, setDraft] = useState(note);
   useEffect(() => setDraft(note), [note]);
   const changed = draft.trim() !== note && !!draft.trim();
+  const [saved, showSaved] = useHold<"ok">();
   return (
     <form
       className="finding-note"
       onSubmit={(e) => {
         e.preventDefault();
-        if (changed) onNote(draft.trim().replace(/\.$/, ""));
+        if (!changed) return;
+        onNote(draft.trim().replace(/\.$/, ""));
+        showSaved("ok");
       }}
     >
       <span className="finding-note__head">
@@ -314,8 +320,8 @@ function FindingNote({ finding, note, names, onNote }: { finding: Finding; note:
       </span>
       <input className="field__input" value={draft} onChange={(e) => setDraft(e.target.value)} aria-label={`Note on ${finding.value}`} />
       <span className="picks">
-        <Wipe tone={changed ? "accent" : "quiet"} size="s" disabled={!changed}>
-          <Icon name="check" />
+        <Wipe tone={changed || saved ? "accent" : "quiet"} size="s" disabled={!changed && !saved} done={saved} doneLabel="Saved">
+          <Icon name="arrow" />
           Save note for {names}
         </Wipe>
         <Wipe tone="quiet" size="s" onClick={() => onNote(undefined)}>

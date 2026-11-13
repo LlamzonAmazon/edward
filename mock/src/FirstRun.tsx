@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { agentNames, askSketchy, askSurface } from "./data";
-import { CopyField, Icon, IconSwap, Swap, token, Wipe } from "./ui";
+import { CopyField, Icon, Swap, token, Wipe } from "./ui";
 
-const writeLabel = (n: number) => `Write to ${n} ${n === 1 ? "agent" : "agents"}`;
+const agentCount = (n: number) => `${n} ${n === 1 ? "agent" : "agents"}`;
+const writeFace = (n: number) => (
+  <>
+    <Icon name="arrow" />
+    Write to {agentCount(n)}
+  </>
+);
 import { AccessList, AgentPicks, Device, SkillPreview } from "./Setup";
 
 type Props = {
@@ -87,9 +93,16 @@ export function FirstRun({ agentIds, onAgents, onClose, onWritten }: Props) {
           </Wipe>
         )}
         {step === 2 && (
-          <Wipe tone="accent" swapKey="write" reserve={[writeLabel(1), writeLabel(7)]} disabled={!agentIds.length} onClick={write}>
-            <IconSwap name={written ? "check" : "arrow"} icons={["arrow", "check"]} />
-            {writeLabel(agentIds.length)}
+          <Wipe
+            tone="accent"
+            swapKey="write"
+            reserve={[writeFace(1), writeFace(7)]}
+            disabled={!agentIds.length}
+            onClick={write}
+            done={written ? "ok" : null}
+            doneLabel={`Wrote to ${agentCount(agentIds.length)}`}
+          >
+            {writeFace(agentIds.length)}
           </Wipe>
         )}
         {step === 3 && (

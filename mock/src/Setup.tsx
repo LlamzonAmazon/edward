@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { access, filesPrompt, skillBody } from "./data";
 import { openPrivacy } from "./api";
 import { useSurface } from "./surface";
-import { Icon, IconSwap, Toggle, Wipe } from "./ui";
+import { Icon, Toggle, useHold, Wipe } from "./ui";
 
 export function AgentPicks({ agentIds, onAgents }: { agentIds: string[]; onAgents: (ids: string[]) => void }) {
   const { agents } = useSurface();
@@ -43,7 +42,7 @@ export function Device() {
 }
 
 export function AccessList() {
-  const [opened, setOpened] = useState<string[]>([]);
+  const [opened, showOpened] = useHold<{ id: string; ok: boolean }>();
   const { filesOn, setFilesOn, sources } = useSurface();
   return (
     <div className="access">
@@ -81,11 +80,16 @@ export function AccessList() {
               tone="quiet"
               size="s"
               onClick={() => {
-                setOpened([...opened, a.id]);
-                void openPrivacy("fda").catch(() => {});
+                openPrivacy("fda").then(
+                  () => showOpened({ id: a.id, ok: true }),
+                  () => showOpened({ id: a.id, ok: false }),
+                );
               }}
+              done={opened?.id === a.id ? (opened.ok ? "ok" : "fail") : null}
+              doneLabel="Opened"
+              failLabel="Could not open"
             >
-              <IconSwap name={opened.includes(a.id) ? "check" : "arrow"} icons={["arrow", "check"]} />
+              <Icon name="arrow" />
               Open System Settings
             </Wipe>
           ) : (
