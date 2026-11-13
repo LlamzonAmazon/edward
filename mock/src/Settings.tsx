@@ -147,11 +147,11 @@ export function Settings(props: Props) {
                         <StopChoice title="Turn off EDwaRd" detail="Quit the program and remove the login item. Store and skills stay on disk. Install again to start." action="Turn off" onClick={() => choose("off")} />
                         <StopChoice title="Delete EDwaRd from this Mac" detail="Remove the program, store, logs, login item, PATH link, and EDwaRd skill files. Same as edward uninstall." action="Delete" onClick={() => choose("delete")} />
                       </div>
-                      {stopMsg ? (
-                        <p className="t-strong step" key={stopMsg} data-dir="next">
-                          {stopMsg}
-                        </p>
-                      ) : null}
+                      <p className="t-strong">
+                        <Swap block swapKey={stopMsg}>
+                          {stopMsg || " "}
+                        </Swap>
+                      </p>
                     </>
                   )}
                   {stopPhase === "confirm" && stopKind === "off" && (

@@ -36,16 +36,15 @@ button {
   cursor: pointer;
   transition: scale var(--dur-fast) var(--ease-out);
 }
-/* Press (principle 1, Response): every control scales down while pressed and
-   comes back on release. Nothing else changes on a click. It uses the
-   individual `scale` property so it composes with a component's own transform,
-   and every control's transition list includes `scale` so a press animates and
-   reverses from wherever it is. Large targets scale less. */
-:where(button, .agent-pick):not(:disabled):active {
+/* Press (principle 1, Response): every clickable element scales to --press
+   while pressed and comes back on release, with the same duration and curve as
+   the primary button. The result of the click is a second signal (see .wipe).
+   It uses the individual `scale` property so it composes with a component's
+   own transform, and every clickable element's transition list includes
+   `scale` so a press animates and reverses from wherever it is. Add any new
+   clickable element that is not a <button> to this selector. */
+:where(button, .agent-pick, .item):not(:disabled):active {
   scale: var(--press);
-}
-:where(.row__head, .agent-pick, .nav__item, .menu__item):not(:disabled):active {
-  scale: var(--press-large);
 }
 :focus-visible {
   outline: 2px solid var(--accent);

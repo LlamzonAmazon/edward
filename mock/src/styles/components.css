@@ -623,7 +623,8 @@ button.nav__heading:hover {
   cursor: pointer;
   transform-box: fill-box;
   transform-origin: center;
-  transition: transform var(--dur-fast) var(--ease-out), fill var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out), fill var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out),
+    scale var(--dur-fast) var(--ease-out);
 }
 .item:hover,
 .item[data-hot="true"] {
