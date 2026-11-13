@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"edward/internal/playbook"
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/playbook"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 type connRec struct {

@@ -5,96 +5,132 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/LlamzonAmazon/edward/internal/agents"
 )
 
-func TestUninstallRemovesSkillsBeforeReturn(t *testing.T) {
+const legacySkill = "---\nname: edward\ndescription: I have access to EDwaRd.\n---\n\n# EDwaRd\n\nI have access to EDwaRd.\n"
+
+type fakeInstall struct {
+	home, data, link, claude string
+}
+
+func setup(t *testing.T) fakeInstall {
+	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("EDWARD_LAUNCH_AGENTS", filepath.Join(home, "LaunchAgents"))
+	t.Setenv("EDWARD_LOGS", filepath.Join(home, "Library", "Logs", "EDwaRd"))
 	t.Setenv("EDWARD_SKIP_DETACH", "1")
-	if err := os.MkdirAll(filepath.Join(home, "LaunchAgents"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	data := filepath.Join(home, "Library", "Application Support", "EDwaRd")
-	if err := os.MkdirAll(filepath.Join(data, "EDwaRd.app", "Contents", "MacOS"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	skill := filepath.Join(home, ".cursor", "skills", "edward")
-	if err := os.MkdirAll(skill, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(skill, "SKILL.md"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	binDir := filepath.Join(home, ".local", "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	link := filepath.Join(binDir, "edward")
-	target := filepath.Join(data, "EDwaRd.app", "Contents", "MacOS", "edward")
-	if err := os.WriteFile(target, []byte("bin"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(target, link); err != nil {
-		t.Fatal(err)
-	}
+	t.Setenv("EDWARD_HOME", data)
+	bin := filepath.Join(data, "EDwaRd.app", "Contents", "MacOS", "edward")
+	link := filepath.Join(home, ".local", "bin", "edward")
 	claude := filepath.Join(home, ".claude", "CLAUDE.md")
-	if err := os.MkdirAll(filepath.Dir(claude), 0o755); err != nil {
+	mustWrite(t, bin, "bin")
+	mustWrite(t, filepath.Join(home, "LaunchAgents", Label+".plist"), "<plist/>")
+	mustWrite(t, filepath.Join(home, "Library", "Logs", "EDwaRd", "edward.log"), "log")
+	mustWrite(t, claude, "keep\n\n<!-- edward:start -->\nI have access to EDwaRd.\n<!-- edward:end -->\n")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(claude, []byte("keep\n<!-- edward:start -->\nx\n<!-- edward:end -->\n"), 0o644); err != nil {
+	if err := os.Symlink(bin, link); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := Uninstall(data); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(skill); !os.IsNotExist(err) {
-		t.Fatalf("skill dir still present: %v", err)
-	}
-	if _, err := os.Stat(link); !os.IsNotExist(err) {
-		t.Fatalf("path link still present: %v", err)
-	}
-	body, err := os.ReadFile(claude)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(body), "edward:start") {
-		t.Fatalf("sentinel left: %q", body)
-	}
-	script := uninstallScript(data)
-	if !strings.Contains(script, "sleep 2") || !strings.Contains(script, "launchctl bootout") {
-		t.Fatalf("detached script missing bootout deferral: %q", script)
-	}
-	if strings.Index(script, "sleep 2") > strings.Index(script, "launchctl bootout") {
-		t.Fatal("bootout must run after sleep so the process can finish cleanup")
-	}
-	if strings.Contains(script, "/"+shellQuote(label)) {
-		t.Fatalf("with EDWARD_LAUNCH_AGENTS set, must not bootout domain/label: %q", script)
-	}
-	if strings.Count(script, "launchctl bootout") != 1 {
-		t.Fatalf("with EDWARD_LAUNCH_AGENTS set, expect one plist bootout only, got: %q", script)
-	}
+	return fakeInstall{home: home, data: data, link: link, claude: claude}
 }
 
-func TestStripSentinels(t *testing.T) {
-	dir := t.TempDir()
-	p := filepath.Join(dir, "CLAUDE.md")
-	body := "keep me\n\n<!-- edward:start -->\nI have access to EDwaRd.\n<!-- edward:end -->\n\nafter\n"
+func mustWrite(t *testing.T, p, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	stripSentinels(p)
-	got, err := os.ReadFile(p)
+}
+
+func gone(t *testing.T, p string) {
+	t.Helper()
+	if _, err := os.Lstat(p); !os.IsNotExist(err) {
+		t.Fatalf("%s still present", p)
+	}
+}
+
+func TestUninstallNowRemovesEverythingAndRunsTwice(t *testing.T) {
+	f := setup(t)
+	for _, d := range agents.AllSkillDirs() {
+		mustWrite(t, filepath.Join(f.home, d, "SKILL.md"), legacySkill)
+	}
+	foreign := filepath.Join(f.home, ".gemini", "skills", "other", "SKILL.md")
+	mustWrite(t, foreign, "---\nname: other\n---\n")
+
+	lines, err := UninstallNow(f.data)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, strings.Join(lines, "\n"))
+	}
+	for _, d := range agents.AllSkillDirs() {
+		gone(t, filepath.Join(f.home, d))
+	}
+	gone(t, f.data)
+	gone(t, f.link)
+	gone(t, filepath.Join(f.home, "LaunchAgents", Label+".plist"))
+	gone(t, LogDir())
+	if _, err := os.Stat(foreign); err != nil {
+		t.Fatalf("another skill was removed: %v", err)
+	}
+	if b, _ := os.ReadFile(f.claude); string(b) != "keep\n" {
+		t.Fatalf("CLAUDE.md = %q", b)
+	}
+
+	lines, err = UninstallNow(f.data)
+	if err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	for _, l := range lines {
+		if strings.HasPrefix(l, agents.StatusRemoved) || strings.HasPrefix(l, agents.StatusStripped) {
+			t.Fatalf("second run changed something: %s", l)
+		}
+	}
+}
+
+func TestUninstallNowLeavesUnownedSkill(t *testing.T) {
+	f := setup(t)
+	mine := filepath.Join(f.home, ".agents", "skills", "edward", "SKILL.md")
+	mustWrite(t, mine, "---\nname: edward\ndescription: someone else's skill\n---\n\nbody\n")
+	lines, err := UninstallNow(f.data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := string(got)
-	if strings.Contains(s, "edward:start") || strings.Contains(s, "edward:end") {
-		t.Fatalf("sentinels left: %q", s)
+	if _, err := os.Stat(mine); err != nil {
+		t.Fatalf("unowned skill removed: %v", err)
 	}
-	if !strings.Contains(s, "keep me") || !strings.Contains(s, "after") {
-		t.Fatalf("kept text missing: %q", s)
+	if !strings.Contains(strings.Join(lines, "\n"), "left in place ~/.agents/skills/edward (not EDwaRd's)") {
+		t.Fatalf("no left-in-place line:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+func TestUninstallRemovesFilesBeforeReturn(t *testing.T) {
+	f := setup(t)
+	skill := filepath.Join(f.home, ".claude", "skills", "edward", "SKILL.md")
+	mustWrite(t, skill, agents.SkillBody())
+	if err := Uninstall(f.data); err != nil {
+		t.Fatal(err)
+	}
+	gone(t, filepath.Dir(skill))
+	gone(t, f.link)
+	if b, _ := os.ReadFile(f.claude); strings.Contains(string(b), agents.StartMark) {
+		t.Fatalf("block left: %q", b)
+	}
+}
+
+func TestRemoveTreeRefusesHome(t *testing.T) {
+	home := t.TempDir()
+	if got := removeTree(home, home); got != agents.StatusLeft {
+		t.Fatalf("removeTree(home) = %s", got)
+	}
+	if got := removeTree(home, "/"); got != agents.StatusLeft {
+		t.Fatalf("removeTree(/) = %s", got)
 	}
 }
 

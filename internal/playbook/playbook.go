@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 var wellKnownPorts = map[string]bool{

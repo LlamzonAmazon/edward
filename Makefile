@@ -17,6 +17,5 @@ app:
 	cp -R mock/dist/. $(WEBDIR)/
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp internal/pack/Info.plist $(APP)/Contents/Info.plist
-	if [ -f skill/edward/SKILL.md ]; then cp skill/edward/SKILL.md $(APP)/Contents/Resources/SKILL.md; fi
 	go build -o $(APP)/Contents/MacOS/edward ./cmd/edward
 	codesign --force --deep -s - $(APP)

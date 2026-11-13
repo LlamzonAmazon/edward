@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"edward/internal/hook"
-	"edward/internal/lifecycle"
-	"edward/internal/playbook"
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/agents"
+	"github.com/LlamzonAmazon/edward/internal/lifecycle"
+	"github.com/LlamzonAmazon/edward/internal/playbook"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 type Runner struct {
@@ -58,7 +58,7 @@ func (r *Runner) Load() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.store = s
-	r.store.Agents = hook.Detect(r.home)
+	r.store.Agents = store.AgentsFrom(agents.Detect(r.home))
 	return nil
 }
 
@@ -117,7 +117,7 @@ func (r *Runner) Tick() {
 	if !sameFast {
 		r.commit(func() {
 			r.store.Host = store.Host{Name: hostName, OS: osName, User: user}
-			r.store.Agents = hook.Detect(r.home)
+			r.store.Agents = store.AgentsFrom(agents.Detect(r.home))
 			r.store.SetSourceItems("processes", procItems, true)
 			r.store.SetSourceItems("connections", connItems, true)
 		}, meta, false, false)
@@ -363,16 +363,25 @@ func (r *Runner) SetNotes(text string) *store.Store {
 }
 
 func (r *Runner) Hook(agentIDs []string) (*store.Store, error) {
-	if err := hook.Write(r.home, agentIDs); err != nil {
-		return nil, err
-	}
+	rep, err := agents.Write(r.home, agentIDs)
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.store.HookReport = &store.HookReport{
+		Written:  nonNil(rep.Written),
+		Removed:  nonNil(rep.Removed),
+		Left:     nonNil(rep.Left),
+		Stripped: nonNil(rep.Stripped),
+		Errors:   nonNil(rep.Errors),
+	}
+	if err != nil {
+		_ = r.saveLocked()
+		return nil, err
+	}
 	if agentIDs == nil {
 		agentIDs = []string{}
 	}
 	r.store.HookedAgents = agentIDs
-	r.store.Agents = hook.Detect(r.home)
+	r.store.Agents = store.AgentsFrom(agents.Detect(r.home))
 	_ = r.saveLocked()
 	return r.store.Clone(), nil
 }
@@ -446,4 +455,11 @@ func itemsKey(items []store.Item) string {
 		b.WriteByte(';')
 	}
 	return b.String()
+}
+
+func nonNil(xs []string) []string {
+	if xs == nil {
+		return []string{}
+	}
+	return xs
 }

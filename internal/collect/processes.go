@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"edward/internal/playbook"
-	"edward/internal/redact"
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/playbook"
+	"github.com/LlamzonAmazon/edward/internal/redact"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 var (

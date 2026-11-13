@@ -1,4 +1,4 @@
-module edward
+module github.com/LlamzonAmazon/edward
 
 go 1.22
 

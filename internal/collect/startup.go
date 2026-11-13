@@ -7,7 +7,7 @@ import (
 
 	"howett.net/plist"
 
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 func CollectStartup(home string) []store.Item {

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/LlamzonAmazon/edward/internal/agents"
 )
 
 type Store struct {
@@ -18,6 +20,7 @@ type Store struct {
 	Host         Host                    `json:"host"`
 	AgentNotes   string                  `json:"agentNotes"`
 	HookedAgents []string                `json:"hookedAgents"`
+	HookReport   *HookReport             `json:"hookReport,omitempty"`
 	Agents       []Agent                 `json:"agents"`
 	Sources      []Source                `json:"sources"`
 	Findings     []Finding               `json:"findings"`
@@ -39,6 +42,15 @@ type Agent struct {
 	Found  *string `json:"found"`
 	Always *string `json:"always"`
 	Skill  string  `json:"skill"`
+}
+
+// HookReport is what the last skill install did, one "~/path" per entry.
+type HookReport struct {
+	Written  []string `json:"written"`
+	Removed  []string `json:"removed"`
+	Left     []string `json:"left"`
+	Stripped []string `json:"stripped"`
+	Errors   []string `json:"errors"`
 }
 
 type Empty struct {
@@ -124,24 +136,28 @@ func New() *Store {
 	return s
 }
 
+// DefaultAgents is the agent table with nothing detected yet.
 func DefaultAgents() []Agent {
-	alwaysClaude := "~/.claude/CLAUDE.md"
-	alwaysCodex := "~/.codex/AGENTS.md"
-	return []Agent{
-		{ID: "claude", Name: "Claude Code", Found: nil, Always: &alwaysClaude, Skill: "~/.claude/skills/edward/SKILL.md"},
-		{ID: "cursor", Name: "Cursor", Found: nil, Always: nil, Skill: "~/.cursor/skills/edward/SKILL.md"},
-		{ID: "codex", Name: "Codex", Found: nil, Always: &alwaysCodex, Skill: "~/.codex/skills/edward/SKILL.md"},
-		{ID: "hermes", Name: "Hermes", Found: nil, Always: nil, Skill: "~/.hermes/skills/edward/SKILL.md"},
-		{ID: "windsurf", Name: "Windsurf", Found: nil, Always: nil, Skill: "~/.codeium/windsurf/skills/edward/SKILL.md"},
-		{ID: "copilot", Name: "GitHub Copilot", Found: nil, Always: nil, Skill: "~/.copilot/skills/edward/SKILL.md"},
-		{ID: "gemini", Name: "Gemini CLI", Found: nil, Always: nil, Skill: "~/.gemini/skills/edward/SKILL.md"},
-		{ID: "cline", Name: "Cline", Found: nil, Always: nil, Skill: "~/.agents/skills/edward/SKILL.md"},
-		{ID: "opencode", Name: "OpenCode", Found: nil, Always: nil, Skill: "~/.config/opencode/skills/edward/SKILL.md"},
-		{ID: "amp", Name: "Amp", Found: nil, Always: nil, Skill: "~/.config/agents/skills/edward/SKILL.md"},
-		{ID: "roo", Name: "Roo Code", Found: nil, Always: nil, Skill: "~/.roo/skills/edward/SKILL.md"},
-		{ID: "kiro", Name: "Kiro", Found: nil, Always: nil, Skill: "~/.kiro/skills/edward/SKILL.md"},
-		{ID: "openclaw", Name: "OpenClaw", Found: nil, Always: nil, Skill: "~/.openclaw/skills/edward/SKILL.md"},
+	out := []Agent{}
+	for _, a := range agents.All() {
+		out = append(out, Agent{ID: a.ID, Name: a.Name, Skill: "~/" + a.SkillDir + "/SKILL.md"})
 	}
+	return out
+}
+
+// AgentsFrom converts detections to store rows. Always is nil for every agent:
+// EDwaRd installs a skill only.
+func AgentsFrom(ds []agents.Detection) []Agent {
+	out := make([]Agent, 0, len(ds))
+	for _, d := range ds {
+		a := Agent{ID: d.ID, Name: d.Name, Skill: d.Skill}
+		if d.Found != "" {
+			found := d.Found
+			a.Found = &found
+		}
+		out = append(out, a)
+	}
+	return out
 }
 
 func SeedSources() []Source {

@@ -3,7 +3,7 @@ package collect
 import (
 	"strings"
 
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 func buildLinks(sources []store.Source) []store.Link {

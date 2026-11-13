@@ -9,7 +9,7 @@ import (
 
 	"howett.net/plist"
 
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 func CollectApps(home string) []store.Item {

@@ -3,7 +3,7 @@ package playbook
 import (
 	"testing"
 
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 func conn(name, addr, dir string) store.Item {

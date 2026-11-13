@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"edward/internal/store"
+	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
 type FilesConfig struct {
