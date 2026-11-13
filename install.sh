@@ -1,24 +1,26 @@
 #!/bin/sh
-# EDwaRd installer. macOS only in this build. No sudo, no password, no token.
+# EDwaRd installer for macOS. No sudo, no password, no account.
+#
+#   curl -fsSL https://raw.githubusercontent.com/LlamzonAmazon/edward/main/install.sh | sh
+#
+# Piped like that, it downloads the latest release and checks its SHA-256.
+# Run from a checkout after `make app`, it installs ./EDwaRd.app instead.
+#
+#   EDWARD_VERSION=v1.0.0   install that release instead of the latest
+#   EDWARD_TARBALL=path     install a local edward-macos.tar.gz (no download)
+#   EDWARD_BUNDLE=path      install a built EDwaRd.app (no download)
+#
+# Everything runs inside main, so a download cut short runs nothing.
 set -eu
 
-if [ "$(id -u)" -eq 0 ]; then
-	echo "EDwaRd refuses to run as root. Run this as the user who will use it." >&2
-	exit 1
-fi
+REPO=LlamzonAmazon/edward
+PORT=43393
+PAGE=http://127.0.0.1:$PORT
 
-os=$(uname -s)
-case "$os" in
-Darwin) ;;
-Linux)
-	echo "This build installs on macOS only. Linux is not in this build." >&2
+die() {
+	echo "EDwaRd: $*" >&2
 	exit 1
-	;;
-*)
-	echo "This build installs on macOS only. $os is not in this build." >&2
-	exit 1
-	;;
-esac
+}
 
 trim_slash() {
 	p=$1
@@ -28,61 +30,37 @@ trim_slash() {
 	printf '%s\n' "$p"
 }
 
-here=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd) || here=.
-if [ ! -f "$here/install/com.edward.agent.plist" ] && [ -f "./install/com.edward.agent.plist" ]; then
-	here=$(pwd)
-fi
+xml_escape() {
+	printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
 
-HOME=${HOME:-}
-if [ -z "$HOME" ]; then
-	echo "HOME is not set." >&2
-	exit 1
-fi
-
-if [ -n "${EDWARD_HOME:-}" ]; then
-	APPDIR=$(trim_slash "$EDWARD_HOME")
-else
-	APPDIR="$HOME/Library/Application Support/EDwaRd"
-fi
-APP="$APPDIR/EDwaRd.app"
-BIN="$APP/Contents/MacOS/edward"
-
-if [ -n "${EDWARD_LAUNCH_AGENTS:-}" ]; then
-	LAUNCH_AGENTS=$(trim_slash "$EDWARD_LAUNCH_AGENTS")
-else
-	LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
-fi
-PLIST="$LAUNCH_AGENTS/com.edward.agent.plist"
-LINK="$HOME/.local/bin/edward"
-TEMPLATE="$here/install/com.edward.agent.plist"
-uid=$(id -u)
-domain="gui/$uid"
+check_platform() {
+	if [ "$(id -u)" -eq 0 ]; then
+		die "refusing to run as root. Run this as the user who will use EDwaRd."
+	fi
+	os=$(uname -s)
+	if [ "$os" != Darwin ]; then
+		die "this build installs on macOS only. $os is not supported."
+	fi
+	ver=$(sw_vers -productVersion 2>/dev/null || echo 0)
+	if [ "${ver%%.*}" -lt 13 ] 2>/dev/null; then
+		die "EDwaRd needs macOS 13 Ventura or later. This Mac runs $ver."
+	fi
+	[ -n "${HOME:-}" ] || die "HOME is not set."
+}
 
 port_in_use() {
-	if command -v lsof >/dev/null 2>&1; then
-		lsof -nP -iTCP:43393 -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 { found=1 } END { exit found ? 0 : 1 }'
-		return
-	fi
-	if command -v nc >/dev/null 2>&1; then
-		nc -z 127.0.0.1 43393 >/dev/null 2>&1
-		return
-	fi
-	return 1
+	lsof -nP -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1
 }
 
 listener_cmd() {
-	pid=$(lsof -nP -iTCP:43393 -sTCP:LISTEN -t 2>/dev/null | awk 'NR==1 { print; exit }') || pid=
-	if [ -z "$pid" ]; then
-		return 0
-	fi
-	ps -p "$pid" -o command= 2>/dev/null || true
+	pid=$(lsof -nP -iTCP:$PORT -sTCP:LISTEN -t 2>/dev/null | awk 'NR==1 { print; exit }') || pid=
+	[ -n "$pid" ] && ps -p "$pid" -o command= 2>/dev/null || true
 }
 
-cmd_is_ours() {
-	cmd=$1
-	bin=$2
-	case "$cmd" in
-	"$bin" | "$bin "*) return 0 ;;
+listener_is_edward() {
+	case $(listener_cmd) in
+	*/EDwaRd.app/Contents/MacOS/edward | */EDwaRd.app/Contents/MacOS/edward\ *) return 0 ;;
 	esac
 	return 1
 }
@@ -96,137 +74,153 @@ bootout_agent() {
 	fi
 }
 
+# fetch_release puts EDwaRd.app in $work, from EDWARD_TARBALL or a download.
+fetch_release() {
+	tarball=$work/edward-macos.tar.gz
+	sums=$work/SHA256SUMS
+	if [ -n "${EDWARD_TARBALL:-}" ]; then
+		[ -f "$EDWARD_TARBALL" ] || die "EDWARD_TARBALL is not a file: $EDWARD_TARBALL"
+		cp "$EDWARD_TARBALL" "$tarball"
+		src_sums=$(dirname -- "$EDWARD_TARBALL")/SHA256SUMS
+		[ -f "$src_sums" ] && cp "$src_sums" "$sums"
+	else
+		if [ -n "${EDWARD_VERSION:-}" ]; then
+			base=https://github.com/$REPO/releases/download/$EDWARD_VERSION
+		else
+			base=https://github.com/$REPO/releases/latest/download
+		fi
+		echo "Downloading $base/edward-macos.tar.gz" >&2
+		curl -fsSL --proto '=https' --tlsv1.2 -o "$tarball" "$base/edward-macos.tar.gz" ||
+			die "download failed: $base/edward-macos.tar.gz"
+		curl -fsSL --proto '=https' --tlsv1.2 -o "$sums" "$base/SHA256SUMS" ||
+			die "download failed: $base/SHA256SUMS"
+	fi
+	if [ -f "$sums" ]; then
+		(cd "$work" && grep ' edward-macos.tar.gz$' SHA256SUMS | shasum -a 256 -c - >/dev/null) ||
+			die "SHA-256 of edward-macos.tar.gz does not match SHA256SUMS. Nothing was installed."
+		echo "SHA-256 verified" >&2
+	elif [ -z "${EDWARD_TARBALL:-}" ]; then
+		die "no SHA256SUMS for this release. Nothing was installed."
+	fi
+	tar -xzf "$tarball" -C "$work" || die "could not unpack edward-macos.tar.gz"
+	[ -d "$work/EDwaRd.app" ] || die "the release has no EDwaRd.app"
+	printf '%s\n' "$work/EDwaRd.app"
+}
+
 find_bundle() {
 	if [ -n "${EDWARD_BUNDLE:-}" ]; then
-		if [ ! -d "$EDWARD_BUNDLE" ]; then
-			echo "EDWARD_BUNDLE is not a directory: $EDWARD_BUNDLE" >&2
-			exit 1
-		fi
+		[ -d "$EDWARD_BUNDLE" ] || die "EDWARD_BUNDLE is not a directory: $EDWARD_BUNDLE"
 		printf '%s\n' "$EDWARD_BUNDLE"
-		return
+	elif [ -z "${EDWARD_TARBALL:-}" ] && [ -f ./install.sh ] && [ -d ./EDwaRd.app ]; then
+		printf '%s\n' "$(pwd)/EDwaRd.app"
+	else
+		fetch_release
 	fi
-	if [ -d "./EDwaRd.app" ]; then
-		printf '%s\n' "$(CDPATH= cd -- "./EDwaRd.app" && pwd)"
-		return
-	fi
-	if [ -d "$here/EDwaRd.app" ]; then
-		printf '%s\n' "$here/EDwaRd.app"
-		return
-	fi
-	if [ -f "$here/SHA256SUMS" ] || [ -f "$here/checksums.sha256" ] || [ -f "$here/EDwaRd.app.sha256" ]; then
-		echo "A checksum file is here, but this build does not download a release. Run make app, then sh install.sh. Or set EDWARD_BUNDLE to a built .app." >&2
-		exit 1
-	fi
-	echo "No EDwaRd.app next to this script or in the current directory. Run make app first, then sh install.sh. Or set EDWARD_BUNDLE to a built .app. This build does not download a binary (no checksum file)." >&2
-	exit 1
 }
 
-if [ ! -f "$TEMPLATE" ]; then
-	echo "Missing $TEMPLATE. Run this from the EDwaRd repo." >&2
-	exit 1
-fi
+# write_plist is the LaunchAgent. install/com.edward.agent.plist is the same
+# text with placeholders; a Go test keeps the two in step.
+write_plist() {
+	b=$(xml_escape "$BIN")
+	d=$(xml_escape "$APPDIR")
+	l=$(xml_escape "$LOGDIR")
+	# plist:start
+	cat >"$PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.edward.agent</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$b</string>
+		<string>serve</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>$d</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>EDWARD_HOME</key>
+		<string>$d</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>$l/edward.log</string>
+	<key>StandardErrorPath</key>
+	<string>$l/edward.log</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+</dict>
+</plist>
+EOF
+	# plist:end
+}
 
-bundle=$(find_bundle)
-if [ ! -f "$bundle/Contents/MacOS/edward" ]; then
-	echo "The bundle has no Contents/MacOS/edward. Run make app." >&2
-	exit 1
-fi
+main() {
+	check_platform
 
-if port_in_use; then
-	cmd=$(listener_cmd)
-	if ! cmd_is_ours "$cmd" "$BIN"; then
-		echo "127.0.0.1:43393 is already in use. Stop that program, then run this again. EDwaRd does not pick another port." >&2
-		if [ -n "$cmd" ]; then
-			echo "Listener: $cmd" >&2
-		fi
+	APPDIR=$(trim_slash "${EDWARD_HOME:-$HOME/Library/Application Support/EDwaRd}")
+	APP=$APPDIR/EDwaRd.app
+	BIN=$APP/Contents/MacOS/edward
+	LAUNCH_AGENTS=$(trim_slash "${EDWARD_LAUNCH_AGENTS:-$HOME/Library/LaunchAgents}")
+	PLIST=$LAUNCH_AGENTS/com.edward.agent.plist
+	LOGDIR=$(trim_slash "${EDWARD_LOGS:-$HOME/Library/Logs/EDwaRd}")
+	LINK=$HOME/.local/bin/edward
+	domain=gui/$(id -u)
+
+	if port_in_use && ! listener_is_edward; then
+		echo "127.0.0.1:$PORT is already in use by another program. Stop it, then run this again." >&2
+		echo "Listener: $(listener_cmd)" >&2
 		exit 1
 	fi
+
+	work=$(mktemp -d "${TMPDIR:-/tmp}/edward-install.XXXXXX")
+	trap 'rm -rf "$work"' EXIT INT TERM
+
+	bundle=$(find_bundle)
+	[ -x "$bundle/Contents/MacOS/edward" ] || die "the bundle has no Contents/MacOS/edward"
+
 	bootout_agent
-fi
-
-mkdir -p "$APPDIR" "$LAUNCH_AGENTS" "$HOME/.local/bin"
-
-rm -rf "$APP"
-if command -v ditto >/dev/null 2>&1; then
+	mkdir -p "$APPDIR" "$LAUNCH_AGENTS" "$LOGDIR" "$HOME/.local/bin"
+	chmod 700 "$APPDIR"
+	rm -rf "$APP"
 	ditto "$bundle" "$APP"
-else
-	cp -R "$bundle" "$APP"
-fi
+	ln -sfn "$BIN" "$LINK"
+	write_plist
 
-if [ ! -f "$BIN" ]; then
-	echo "The bundle has no Contents/MacOS/edward. Run make app." >&2
-	exit 1
-fi
-chmod +x "$BIN" 2>/dev/null || true
-
-ln -sfn "$BIN" "$LINK"
-
-awk -v bin="$BIN" -v dir="$APPDIR" '
-{
-	gsub(/__BINARY__/, bin)
-	gsub(/__DATADIR__/, dir)
-	print
-}
-' "$TEMPLATE" >"$PLIST"
-
-bootout_agent
-
-if port_in_use; then
-	cmd=$(listener_cmd)
-	if ! cmd_is_ours "$cmd" "$BIN"; then
-		echo "127.0.0.1:43393 is already in use. Stop that program, then run this again. EDwaRd does not pick another port." >&2
-		if [ -n "$cmd" ]; then
-			echo "Listener: $cmd" >&2
+	# An EDwaRd from an older build can outlive bootout. Stop it by binary path.
+	i=0
+	while port_in_use && [ "$i" -lt 5 ]; do
+		if ! listener_is_edward; then
+			die "127.0.0.1:$PORT was taken by another program during install."
 		fi
-		exit 1
-	fi
-	# Ours is still up after bootout. Stop it by binary path, then recheck.
-	ps -axo pid=,command= 2>/dev/null | while IFS= read -r line; do
-		pid=$(printf '%s\n' "$line" | awk '{ print $1 }')
-		rest=$(printf '%s\n' "$line" | sed 's/^[[:space:]]*[0-9][0-9]*[[:space:]]*//')
-		case "$rest" in
-		"$BIN" | "$BIN "*)
-			if [ -n "$pid" ] && [ "$pid" -ne "$$" ]; then
-				kill "$pid" 2>/dev/null || true
-			fi
-			;;
-		esac
+		pkill -f "/EDwaRd.app/Contents/MacOS/edward" 2>/dev/null || true
+		sleep 1
+		i=$((i + 1))
 	done
-	sleep 1
-	if port_in_use; then
-		echo "127.0.0.1:43393 is already in use. Stop that program, then run this again. EDwaRd does not pick another port." >&2
-		exit 1
-	fi
-fi
 
-if ! launchctl bootstrap "$domain" "$PLIST"; then
-	echo "launchctl bootstrap failed for $PLIST" >&2
-	exit 1
-fi
+	launchctl bootstrap "$domain" "$PLIST" || die "launchctl bootstrap failed for $PLIST"
 
-echo "http://127.0.0.1:43393"
-i=0
-up=0
-while [ "$i" -lt 20 ]; do
-	if command -v curl >/dev/null 2>&1 && curl -sf --max-time 1 "http://127.0.0.1:43393/" >/dev/null 2>&1; then
-		up=1
-		break
-	fi
-	i=$((i + 1))
-	sleep 1
-done
-if [ "$up" -ne 1 ]; then
-	echo "Installed, but http://127.0.0.1:43393 did not answer within 20s. Check: launchctl print \"gui/$(id -u)/com.edward.agent\"" >&2
-	exit 1
-fi
+	i=0
+	while ! curl -sf --max-time 1 "$PAGE/" >/dev/null 2>&1; do
+		i=$((i + 1))
+		if [ "$i" -ge 20 ]; then
+			die "installed, but $PAGE did not answer within 20 seconds. Log: $LOGDIR/edward.log"
+		fi
+		sleep 1
+	done
 
-if command -v open >/dev/null 2>&1; then
-	open "http://127.0.0.1:43393" || true
-fi
+	echo
+	echo "EDwaRd $("$BIN" version) is running: $PAGE"
+	echo "Log:       $LOGDIR/edward.log"
+	echo "Uninstall: ~/.local/bin/edward uninstall"
+	case ":$PATH:" in
+	*":$HOME/.local/bin:"*) ;;
+	*) echo "Add ~/.local/bin to PATH to run edward by name." ;;
+	esac
+	open "$PAGE" >/dev/null 2>&1 || true
+}
 
-case ":$PATH:" in
-*:"$HOME/.local/bin":*) ;;
-*)
-	echo "$HOME/.local/bin is not on PATH. The page still opens. Add that directory to PATH if you want the edward command."
-	;;
-esac
+main "$@"

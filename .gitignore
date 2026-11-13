@@ -13,5 +13,7 @@ dist/
 *.log
 .env
 .tmp-edward-agent-test/
-internal/server/web/
+internal/server/web/*
+!internal/server/web/.gitkeep
+.build/
 docs/

@@ -139,3 +139,29 @@ func TestShellQuote(t *testing.T) {
 		t.Fatalf("quote %q", shellQuote(`a'b`))
 	}
 }
+
+// TestInstallPlistMatchesTemplate keeps the LaunchAgent that install.sh writes
+// in step with install/com.edward.agent.plist.
+func TestInstallPlistMatchesTemplate(t *testing.T) {
+	script, err := os.ReadFile("../../install.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl, err := os.ReadFile("../../install/com.edward.agent.plist")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(script)
+	start := strings.Index(s, "<<EOF\n")
+	end := strings.Index(s, "\nEOF\n")
+	if start < 0 || end < start {
+		t.Fatal("install.sh has no plist heredoc")
+	}
+	got := strings.NewReplacer("$b", "__BINARY__", "$d", "__DATADIR__", "$l", "__LOGDIR__").Replace(s[start+6 : end+1])
+	if got != string(tmpl) {
+		t.Fatalf("install.sh plist differs from the template:\n%s", got)
+	}
+	if !strings.Contains(got, "<string>serve</string>") || !strings.Contains(got, "<string>"+Label+"</string>") {
+		t.Fatal("plist must run edward serve under " + Label)
+	}
+}
