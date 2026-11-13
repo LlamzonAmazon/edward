@@ -31,7 +31,7 @@ export function FirstRun({ agentIds, onAgents, onClose, onWritten }: Props) {
   const write = () => {
     setWritten(true);
     onWritten();
-    window.setTimeout(() => go(3), token("--dur-hold") / 2);
+    window.setTimeout(() => go(3), token("--dur-base") + token("--dur-hold"));
   };
 
   const titles = ["What do you use?", "What EDwaRd can see", `Add EDwaRd to ${agentNames(agentIds, " and ")}`, "Ask your agent"];

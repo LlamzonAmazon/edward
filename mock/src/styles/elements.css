@@ -247,46 +247,57 @@ dd {
   display: grid;
   width: 100%;
 }
-.swap__base,
-.swap__layer {
+.swap > .swap__base,
+.swap > .swap__layer {
   grid-area: 1 / 1;
+  align-self: stretch;
   display: inline-flex;
   align-items: center;
   gap: inherit;
   min-width: 0;
   max-width: 100%;
 }
-.swap--block .swap__base,
-.swap--block .swap__layer {
+.swap--block > .swap__base,
+.swap--block > .swap__layer {
   display: block;
 }
-.swap__layer {
+.swap > .swap__layer {
   pointer-events: none;
 }
-.swap[data-phase="prep"] .swap__base {
+/* Roll: both copies fill the cell's height, so 100% is a full exit from the
+   mask (.swap has overflow: hidden). Up by default; data-roll="down" reverses. */
+.swap[data-phase="prep"] > .swap__base {
   transition: none;
-  clip-path: inset(0 0 0 0);
+  translate: 0 0;
 }
-.swap[data-phase="prep"] .swap__layer {
+.swap[data-phase="prep"] > .swap__layer {
   transition: none;
-  clip-path: inset(0 100% 0 0);
+  translate: 0 100%;
 }
-.swap[data-phase="go"] .swap__base {
-  transition: clip-path var(--dur-base) var(--ease-out);
-  clip-path: inset(0 0 0 100%);
+.swap[data-phase="prep"][data-roll="down"] > .swap__layer {
+  translate: 0 -100%;
 }
-.swap[data-phase="go"] .swap__layer {
-  transition: clip-path var(--dur-base) var(--ease-out);
-  clip-path: inset(0 0 0 0);
+.swap[data-phase="go"] > .swap__base,
+.swap[data-phase="go"] > .swap__layer {
+  transition: translate var(--dur-base) var(--ease-out);
+}
+.swap[data-phase="go"] > .swap__base {
+  translate: 0 -100%;
+}
+.swap[data-phase="go"][data-roll="down"] > .swap__base {
+  translate: 0 100%;
+}
+.swap[data-phase="go"] > .swap__layer {
+  translate: 0 0;
 }
 
 /* Wipe: the one hover behavior for every action that commits something.
    The label is rendered twice; the top copy is clipped in from the left edge.
    A click gives two signals: the press scale (input received) and the result.
    When the result is not visible at the button (copy, save, open another app),
-   the face wipes to a check and a past-tense label ("Copy" to "Copied"), or to
-   a failure label, inside a Swap that reserves every face, so the size and
-   color never change. */
+   the face rolls up to a check and a past-tense label ("Copy" to "Copied"), or
+   to a failure label, holds, and rolls back down, inside a Swap that reserves
+   every face, so the size and color never change. */
 .wipe {
   --w-bg: var(--accent);
   --w-fg: var(--on-accent);

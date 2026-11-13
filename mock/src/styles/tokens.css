@@ -127,7 +127,8 @@
   --dur-base: 240ms;
   --dur-slow: 380ms;
   --dur-stagger: 900ms;
-  --dur-hold: 1600ms;
+  /* How long a confirmation stays fully shown before it rolls back. */
+  --dur-hold: 500ms;
   --dur-toast: 4200ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-move: cubic-bezier(0.65, 0, 0.35, 1);

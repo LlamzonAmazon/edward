@@ -168,15 +168,17 @@ export function Icon({ name }: { name: AnyIcon }) {
 }
 
 /**
- * In-place content wipe for a real state change (a title, Pause and Resume).
- * Old content clips away left to right while new content clips in.
+ * In-place content roll for a state change (a title, Pause and Resume, a
+ * confirmation). Inside a mask the old content moves up and out while the new
+ * content moves up in from below. dir="down" reverses it, for a return to the
+ * previous content (a confirmation going back to its rest label).
  *
  * - Size: pass `reserve` with every label the slot can show. They are laid out
  *   hidden in the same cell, so the slot is always as wide as the widest one
  *   and nothing around it moves when the label changes.
- * - Interruptible: a change that arrives mid-wipe finishes the running wipe at
+ * - Interruptible: a change that arrives mid-roll finishes the running roll at
  *   once and starts the next one from there. Nothing queues.
- * - Pass swapKey when children update often (tickers) but should only wipe on
+ * - Pass swapKey when children update often (tickers) but should only roll on
  *   real state changes.
  */
 export function Swap({
@@ -184,30 +186,32 @@ export function Swap({
   swapKey,
   block,
   reserve,
+  dir = "up",
   className = "",
 }: {
   children: ReactNode;
   swapKey?: string | number | boolean;
   block?: boolean;
   reserve?: ReactNode[];
+  dir?: "up" | "down";
   className?: string;
 }) {
   const key = swapKey !== undefined ? String(swapKey) : contentKey(children);
   const reduce = useReducedMotion();
   const [current, setCurrent] = useState<{ key: string; node: ReactNode }>({ key, node: children });
-  const [incoming, setIncoming] = useState<{ key: string; node: ReactNode } | null>(null);
+  const [incoming, setIncoming] = useState<{ key: string; node: ReactNode; dir: "up" | "down" } | null>(null);
   const [phase, setPhase] = useState<"idle" | "prep" | "go">("idle");
 
   useEffect(() => {
     if (incoming && key === incoming.key) {
-      if (incoming.node !== children) setIncoming({ key, node: children });
+      if (incoming.node !== children) setIncoming({ ...incoming, node: children });
       return;
     }
     if (!incoming && key === current.key) {
       if (current.node !== children) setCurrent({ key, node: children });
       return;
     }
-    // A new state. If a wipe is running, its target becomes the base at once.
+    // A new state. If a roll is running, its target becomes the base at once.
     if (incoming) setCurrent(incoming);
     if (reduce) {
       setCurrent({ key, node: children });
@@ -215,9 +219,9 @@ export function Swap({
       setPhase("idle");
       return;
     }
-    setIncoming({ key, node: children });
+    setIncoming({ key, node: children, dir });
     setPhase("prep");
-  }, [key, children, reduce]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, children, reduce, dir]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (phase !== "prep") return;
@@ -248,12 +252,12 @@ export function Swap({
   }, [phase, incoming]);
 
   const onLayerEnd = (e: TransitionEvent<HTMLSpanElement>) => {
-    if (e.propertyName !== "clip-path" || e.target !== e.currentTarget) return;
+    if (e.propertyName !== "translate" || e.target !== e.currentTarget) return;
     finish();
   };
 
   return (
-    <span className={["swap", block ? "swap--block" : "", className].filter(Boolean).join(" ")} data-phase={phase}>
+    <span className={["swap", block ? "swap--block" : "", className].filter(Boolean).join(" ")} data-phase={phase} data-roll={incoming?.dir ?? "up"}>
       {reserve?.map((r, i) => (
         <span key={`r${i}`} className="swap__reserve" aria-hidden>
           {r}
@@ -313,7 +317,12 @@ export function Wipe({ tone = "accent", size = "m", block, disabled, className =
   // The label is drawn twice (rest face and hover layer). Both Swaps get the same
   // key and reserve in the same render, so they change on the same frame.
   const face = (
-    <Swap className="wipe__face" swapKey={confirms && done ? done : swapKey} reserve={confirms ? [...(reserve ?? [children]), okFace, failFace] : reserve}>
+    <Swap
+      className="wipe__face"
+      swapKey={confirms && done ? done : swapKey}
+      reserve={confirms ? [...(reserve ?? [children]), okFace, failFace] : reserve}
+      dir={confirms && !done ? "down" : "up"}
+    >
       {shown}
     </Swap>
   );
@@ -441,8 +450,9 @@ export function useEscape(onEsc: () => void, active: boolean) {
 }
 
 /**
- * A result that shows for --dur-hold after each call. A call during the hold
- * replaces the value and restarts the hold, so repeated clicks never queue.
+ * A result that rolls in (--dur-base), stays fully shown for --dur-hold, then
+ * rolls back. A call during the hold replaces the value and restarts the hold,
+ * so repeated clicks never queue.
  */
 export function useHold<T>(): [T | null, (v: T) => void] {
   const [value, setValue] = useState<T | null>(null);
@@ -451,14 +461,14 @@ export function useHold<T>(): [T | null, (v: T) => void] {
   const show = useCallback((v: T) => {
     setValue(v);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setValue(null), token("--dur-hold"));
+    timer.current = window.setTimeout(() => setValue(null), token("--dur-base") + token("--dur-hold"));
   }, []);
   return [value, show];
 }
 
 /**
- * Copy: on click the button presses, then the face changes from the copy icon
- * and label to a check and "Copied" for --dur-hold. The size never changes. If
+ * Copy: on click the button presses, then the face rolls from the copy icon and
+ * label to a check and "Copied", holds, and rolls back down. The size never changes. If
  * the clipboard refuses, it says so instead.
  */
 export function CopyButton({ text, tone = "accent", size = "m", label = "Copy", onCopied }: { text: string; tone?: WipeProps["tone"]; size?: WipeProps["size"]; label?: string; onCopied?: () => void }) {
