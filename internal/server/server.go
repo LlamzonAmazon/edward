@@ -4,11 +4,12 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"edward/internal/collect"
+	"github.com/LlamzonAmazon/edward/internal/collect"
 )
 
 //go:embed all:web
@@ -22,7 +23,17 @@ func New(r *collect.Runner) http.Handler {
 	return &api{r: r}
 }
 
+// allowedHosts are the only Host values the page is served under. Anything else
+// is a DNS rebinding attempt or a misconfigured proxy.
+var allowedHosts = map[string]bool{"127.0.0.1:43393": true, "localhost:43393": true}
+
+const maxBody = 1 << 20
+
 func (h *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if status, msg := guard(r); status != 0 {
+		http.Error(w, msg, status)
+		return
+	}
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		h.serveAPI(w, r)
 		return
@@ -216,7 +227,35 @@ func (h *api) serveWeb(w http.ResponseWriter, r *http.Request) {
 	http.FileServer(http.FS(sub)).ServeHTTP(w, r)
 }
 
+// guard rejects requests a web page on another site could send. Browsers only
+// send a JSON POST cross-site after a CORS preflight, and this server answers
+// no preflight, so requiring application/json blocks cross-site writes. Host
+// and Origin checks block DNS rebinding reads. curl from a local agent sends no
+// Origin and passes.
+func guard(r *http.Request) (int, string) {
+	if !allowedHosts[r.Host] {
+		return http.StatusForbidden, "forbidden host"
+	}
+	if !strings.HasPrefix(r.URL.Path, "/api/") {
+		return 0, ""
+	}
+	if o := r.Header.Get("Origin"); o != "" && !allowedHosts[strings.TrimPrefix(o, "http://")] {
+		return http.StatusForbidden, "forbidden origin"
+	}
+	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		return http.StatusForbidden, "forbidden origin"
+	}
+	if r.Method == http.MethodPost {
+		ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if ct != "application/json" {
+			return http.StatusUnsupportedMediaType, "content type must be application/json"
+		}
+	}
+	return 0, ""
+}
+
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(v); err != nil {
 		http.Error(w, "bad json", http.StatusBadRequest)
