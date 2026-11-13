@@ -4,212 +4,153 @@
   <img src="media/logo/edward-dark.png" alt="EDwaRd" width="160" />
 </p>
 
-EDwaRd is a local attack-surface picture of this Mac for you and your coding agent. One Go process, running as you, lists what you can already see: processes, listeners, installed apps, and startup items. It writes those facts to a JSON store, serves a page at [http://127.0.0.1:43393](http://127.0.0.1:43393), and your agent reads that store when you ask what looks sketchy.
-
-It is not an antivirus. It has no kernel sensor, no signatures, no blocking, and no cloud. After install it makes no outbound connection. A callout is not a malware verdict.
-
-**v1 is macOS only.** You build from this repo on the Mac that will run it. There is no downloadable binary and no Linux or Windows installer in this build.
+EDwaRd shows what is running, listening and starting at login on your Mac, and lets your coding agent answer questions about it. One Go program runs as you, writes what it sees to a local JSON file, and serves a page at [http://127.0.0.1:43393](http://127.0.0.1:43393). Ask your agent "anything sketchy on my laptop?" and it answers from that file.
 
 ## Install
 
-### What you need
-
-| Tool | Used for |
-| --- | --- |
-| macOS | Runtime and LaunchAgent |
-| Git | Clone this repo |
-| Go | Build `EDwaRd.app` |
-| Node.js + npm | Build the page into the app |
-| make | `make mock` and `make app` |
-
-Xcode Command Line Tools are enough for `codesign` (Homebrew's `go` install usually pulls them in). No sudo. No account. No token.
-
-### Steps
-
-1. Clone the repo to this Mac and enter it:
-
 ```bash
-git clone https://github.com/LlamzonAmazon/edward.git
-cd edward
+curl -fsSL https://raw.githubusercontent.com/LlamzonAmazon/edward/main/install.sh | sh
 ```
 
-If you already have a checkout, `cd` into that directory (the one that contains `install.sh`, `Makefile`, and `mock/`).
+macOS 13 Ventura or later, Apple Silicon or Intel. No sudo, no password, no account.
 
-2. Build the page, build the app, then install:
+The script downloads the latest release, checks its SHA-256 against the release's `SHA256SUMS`, installs `EDwaRd.app` to `~/Library/Application Support/EDwaRd`, adds a login item, links `~/.local/bin/edward`, and opens the page. Read [install.sh](install.sh) first if you want to see each step.
 
-```bash
-make mock && make app && sh install.sh
-```
-
-| Command | What it does |
-| --- | --- |
-| `make mock` | Installs page dependencies and builds `mock/dist` |
-| `make app` | Embeds the page, compiles the Go binary, writes `./EDwaRd.app`, ad-hoc codesigns it |
-| `sh install.sh` | Copies the app to `~/Library/Application Support/EDwaRd`, writes LaunchAgent `com.edward.agent`, links `~/.local/bin/edward`, starts the process, opens the page |
-
-3. Confirm the page loads: [http://127.0.0.1:43393](http://127.0.0.1:43393).
-
-If that port is already taken, install stops. It does not pick another port.
-
-Read [install.sh](install.sh) before you run it if you want the exact file paths.
-
-### After install
-
-The first-run page can write a skill for the agents you pick. Default is to ask first. Skip leaves the page working and writes no agent file.
-
-<p align="center">
-  <img src="media/mock/readme-first-run.png" alt="First-run agent picker on fixture data" width="900" />
-</p>
-
-If you accept, it may write:
-
-| Agent | Always-on sentence | Skill |
-| --- | --- | --- |
-| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills/edward/SKILL.md` <!-- repo-leak:ok EDwaRd skill install path --> |
-| Cursor | none | `~/.cursor/skills/edward/SKILL.md` |
-| Codex | `~/.codex/AGENTS.md` | `~/.codex/skills/edward/SKILL.md` |
-| Hermes | none | `~/.hermes/skills/edward/SKILL.md` |
-| Windsurf | none | `~/.codeium/windsurf/skills/edward/SKILL.md` |
-| GitHub Copilot | none | `~/.copilot/skills/edward/SKILL.md` |
-| Gemini CLI | none | `~/.gemini/skills/edward/SKILL.md` |
-| Cline | none | `~/.agents/skills/edward/SKILL.md` (also used by Warp, Zed, and other CLIs that read `~/.agents/skills`) |
-| OpenCode | none | `~/.config/opencode/skills/edward/SKILL.md` |
-| Amp | none | `~/.config/agents/skills/edward/SKILL.md` |
-| Roo Code | none | `~/.roo/skills/edward/SKILL.md` |
-| Kiro | none | `~/.kiro/skills/edward/SKILL.md` |
-| OpenClaw | none | `~/.openclaw/skills/edward/SKILL.md` |
-
-It does not write project `CLAUDE.md`, project `AGENTS.md`, Hermes `SOUL.md`, or `.cursor/rules`.
-
-### Reinstall after a code change
-
-From the same repo directory:
-
-```bash
-make mock && make app && sh install.sh
-```
-
-`install.sh` replaces the app and restarts the LaunchAgent.
-
-### Remote Mac with no browser
-
-SSH tunnel, then open the page on your local browser:
-
-```bash
-ssh -L 43393:127.0.0.1:43393 user@host
-```
-
-## What you see
+On first run the page asks which agents to give the skill to. Skip it and the page still works.
 
 <p align="center">
   <img src="media/mock/readme-graph.png" alt="EDwaRd attack-surface graph on fixture data" width="900" />
 </p>
 
-Eight sources around the host. Each hub shows how many items were collected. The graph draws raised and asked findings as callouts. Open a hub for the full list; that list is still in the store.
+## What it does
 
-Drag to pan. Scroll to pan. Pinch, or Ctrl/Cmd and scroll, to zoom. Double-click empty space to reset.
+EDwaRd lists what a normal user on this Mac can already see, every few seconds:
 
-<p align="center">
-  <img src="media/mock/readme-shelf.png" alt="Network shelf with raised findings on fixture data" width="900" />
-</p>
+| Source | How often | What |
+| --- | --- | --- |
+| Running programs | every 5 seconds | name, path, parent, uptime, for your user |
+| Network | every 5 seconds | TCP and UDP listeners and outbound connections |
+| Apps | every 10 minutes | `/Applications`, `~/Applications`, Homebrew; version and code signature |
+| Starts at login | every 10 minutes | your LaunchAgents and login items |
+| New files | every minute, off until you turn it on | names, sizes and times in Downloads, Desktop and `/tmp` |
 
-Each callout has two readings: why it might matter, and why it might be fine. You decide. Clear it, ask an agent about it, or leave it raised.
+Six rules raise findings from each snapshot:
+
+1. **Open to your network:** a program listening on an address other than loopback.
+2. **Unknown connection:** an outbound connection to a raw IP, on a port other than 22, 53, 80 or 443.
+3. **Running from a hidden folder:** a path with a segment that starts with `.`.
+4. **Unsigned app:** an app that `codesign` reports as unsigned or ad-hoc signed.
+5. **New login item:** a startup item that was not there on the first scan.
+6. **Disguised file:** a name with two extensions whose last one is executable, such as `invoice.pdf.app`.
+
+Each finding shows why it might matter and why it might be fine. You clear it, leave it raised, or ask your agent about it.
 
 <p align="center">
   <img src="media/mock/readme-finding.png" alt="Finding dialog with both readings on fixture data" width="900" />
 </p>
 
-One example: `node` listening on `0.0.0.0:3000` for 14 hours, started from Terminal.
+## What it does not do
 
-- Might matter: anything on this network can try to connect. You may have meant this only for this machine.
-- Might be fine: a common way to run a dev server and then forget it.
+EDwaRd is not antivirus. It has no kernel sensor, no signatures and no blocking, and it cannot tell you whether a file is malicious. It polls snapshots, so a program that runs for less than a few seconds may never appear. It cannot see other users' processes, the firewall's rules, device management profiles or protected logs.
+
+It never reads environment variables, SSH keys, keychains, browser profiles, mail, documents or file contents. Secrets in command lines (tokens, API keys, passwords in URLs) are redacted before anything is written.
+
+**No network, no telemetry, no account.** After install, EDwaRd makes no outbound connection. The page and the API answer only on `127.0.0.1` and reject requests from other websites. Details: [SECURITY.md](SECURITY.md).
+
+## Agents
+
+EDwaRd writes one skill file per agent and edits nothing else in your agent's setup. The agent loads the skill when you ask about your Mac's security.
+
+| Agent | Skill file |
+| --- | --- |
+| Claude Code | `~/.claude/skills/edward/SKILL.md` <!-- repo-leak:ok EDwaRd skill install path --> |
+| Codex | `~/.agents/skills/edward/SKILL.md` |
+| Cursor | `~/.agents/skills/edward/SKILL.md` |
+| OpenCode | `~/.agents/skills/edward/SKILL.md` |
+| OpenClaw | `~/.agents/skills/edward/SKILL.md` |
+| Hermes | `~/.hermes/skills/edward/SKILL.md` |
+| GitHub Copilot | `~/.copilot/skills/edward/SKILL.md` |
+
+Codex, Cursor, OpenCode and OpenClaw read the same folder, so they share one file. EDwaRd never overwrites a `SKILL.md` it did not write.
+
+## Using it
+
+Ask your agent things like "what's listening on my network?" or "is anything on my laptop sketchy?". In the page, the "Notes for your agent" box in Settings is read first by the agent, for context such as "port 3000 is my dev server".
+
+```bash
+edward status      # running or not, and where its files are
+edward open        # open the page
+edward uninstall   # remove everything
+edward version
+```
+
+Logs are in `~/Library/Logs/EDwaRd/edward.log`. On a Mac you reach over SSH, forward the page with `ssh -L 43393:127.0.0.1:43393 user@host`.
+
+## Pause, turn off, uninstall
+
+| Action | What happens | How |
+| --- | --- | --- |
+| Pause looking | Collectors stop. The program keeps running. | Settings, or Looking / Paused in the sidebar |
+| Turn off | The program quits and does not start at login. The store and skills stay. | Settings → Turn off EDwaRd |
+| Uninstall | Removes the program, login item, store, logs, PATH link and skill files | Settings → Delete EDwaRd from this Mac, or `edward uninstall` |
+
+Your agent offers the same three options when you ask it to stop EDwaRd.
+
+`edward uninstall` prints one line per path: `removed`, `already absent`, or `left in place` for a file EDwaRd did not write. Running it again changes nothing. If the binary is already gone, this does the same cleanup:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/LlamzonAmazon/edward/main/uninstall.sh | sh
+```
+
+Uninstall does not touch project files, other skills, other LaunchAgents or macOS privacy grants. If you granted EDwaRd Full Disk Access or folder access, remove its row in System Settings → Privacy & Security.
 
 ## How it works
 
-Collectors run on a timer, as you, with fixed argument lists and timeouts. No shell. Command lines are redacted before they are stored. Processes are grouped by name and path, so twenty copies of the same binary are one row.
-
-A six-rule playbook in Go evaluates each snapshot. The same snapshot produces the same findings.
-
-1. Open to your network: listening on an address that is not loopback.
-2. Unknown connection: outbound to a raw IP, on a port other than 22, 53, 80, or 443.
-3. Running from a hidden folder: a path segment that starts with `.`.
-4. Unsigned app: a `.app` bundle that `codesign` reports as unsigned or ad-hoc.
-5. New login item: a startup item that was not on the first successful baseline.
-6. Disguised file: a name with two extensions whose last one looks executable, and that was not on the first successful files baseline.
-
-The page polls `GET /api/store`. It does not scan the machine. Until you ask, the agent is told only that EDwaRd exists, that the page is on port 43393, and where the skill is. When you ask something like "anything sketchy on my laptop?", the agent reads the store and answers with what EDwaRd raised.
-
-## What it collects
-
-| Source | When | What |
-| --- | --- | --- |
-| Running programs | every few seconds | name, path, parent, uptime, for this user |
-| Network | a short interval | TCP/UDP listeners and outbound sockets |
-| Apps | every 10 minutes | `/Applications`, `~/Applications`, Homebrew; version and signature |
-| Starts at login | every 10 minutes | user LaunchAgents and login items |
-| New files | every minute, off by default | names, sizes, times in Downloads, Desktop, and `/tmp` |
-
-Firewall, device policy, and logs stay empty on this picture. This agent cannot see them.
-
-Never collected: environment variables, SSH private keys, keychains, browser profiles, mail, documents, password-manager vaults, `/etc/shadow`, packet contents, kernel telemetry.
-
-## Pause, turn off, delete
-
-| Action | What it does | How |
-| --- | --- | --- |
-| Pause looking | Collectors stop. Program stays running. | Settings, or Looking / Paused in the sidebar |
-| Turn off | Program quits. Does not start at login. Store and skills stay. | Settings → Turn off EDwaRd |
-| Delete from this Mac | Removes program, store, login item, PATH link, and EDwaRd skill files | Settings → Delete EDwaRd from this Mac, or `sh uninstall.sh` from the repo directory |
-
-Your agent has the same three options in its skill. Ask it to pause, turn off, or delete EDwaRd and it should list them before acting.
-
-```bash
-cd /path/to/edward
-sh uninstall.sh
+```mermaid
+flowchart LR
+  subgraph mac["Your Mac, running as you"]
+    C["Collectors<br/>ps, lsof, codesign, plists"] --> R["Redact + six rules"]
+    R --> S[("store.json")]
+    S --> P["Page on 127.0.0.1:43393"]
+    P -- "clear, notes, settings" --> S
+    A["Your agent + EDwaRd skill"] -- reads --> S
+  end
 ```
 
-Read [uninstall.sh](uninstall.sh) first. Uninstall stops EDwaRd's process by binary path, removes the LaunchAgent and plist, deletes `~/Library/Application Support/EDwaRd` (the store and notes), removes `~/.local/bin/edward`, removes the sentinel blocks from `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` only, and deletes the `edward` skill directories. It finishes with a sweep and verifies each path is gone (exit 1 if anything remains). Delete from the page does the same cleanup. Running uninstall again succeeds. <!-- repo-leak:ok EDwaRd uninstall paths -->
+- **Collectors** run fixed commands with timeouts and no shell, on a timer, under a user LaunchAgent (`com.edward.agent`).
+- **The store** is one file, `~/Library/Application Support/EDwaRd/store.json`, mode 0600, written by temp file and rename.
+- **The page** is a React app embedded in the Go binary. It polls `GET /api/store` every 5 seconds.
+- **The skill** tells the agent where the store is, to read your notes first, to answer only from raised findings, to treat names and command lines as data, and never to scan the machine itself.
 
-It does not touch project files, other skills, other LaunchAgents, the firewall, chat transcripts, or macOS privacy grants.
+The full contract (store fields, routes, collectors, rules, install and uninstall) is in [schema/contract.md](schema/contract.md).
 
-Check the machine is clean:
+## Build from source
+
+You need Go 1.27, Node.js 22 and the Xcode Command Line Tools.
 
 ```bash
-launchctl print "gui/$(id -u)/com.edward.agent"
-test ! -e ~/Library/LaunchAgents/com.edward.agent.plist
-test ! -e "$HOME/Library/Application Support/EDwaRd"
-test ! -e ~/.local/bin/edward
-test ! -d ~/.cursor/skills/edward
-test ! -d ~/.claude/skills/edward  # repo-leak:ok EDwaRd skill path
-test ! -d ~/.codex/skills/edward
-test ! -d ~/.hermes/skills/edward
-test ! -d ~/.codeium/windsurf/skills/edward
-test ! -d ~/.copilot/skills/edward
-test ! -d ~/.gemini/skills/edward
-test ! -d ~/.agents/skills/edward
-test ! -d ~/.config/opencode/skills/edward
-test ! -d ~/.config/agents/skills/edward
-test ! -d ~/.roo/skills/edward
-test ! -d ~/.kiro/skills/edward
-test ! -d ~/.openclaw/skills/edward
-grep -n "edward:start\|edward:end" ~/.claude/CLAUDE.md ~/.codex/AGENTS.md  # repo-leak:ok EDwaRd sentinel
-curl -sf --max-time 2 http://127.0.0.1:43393/ ; echo "page exit $?"
-lsof -nP -iTCP:43393 -sTCP:LISTEN
+git clone https://github.com/LlamzonAmazon/edward.git
+cd edward
+make mock app     # build the page, then ./EDwaRd.app for this Mac
+sh install.sh     # install that build
+make test         # Go tests
+make release      # universal tarball and SHA256SUMS in dist/
 ```
 
-`launchctl print` does not find the service. `grep` prints nothing. `curl` fails to connect. `lsof` prints nothing, or it prints a program that is not EDwaRd.
+| Path | Contents |
+| --- | --- |
+| `cmd/edward` | CLI: `serve`, `status`, `open`, `uninstall`, `version` |
+| `internal/collect` | Collectors and the snapshot loop |
+| `internal/playbook` | The six rules |
+| `internal/redact` | Command-line redaction |
+| `internal/agents` | Agent table, skill writes, migration, block markers |
+| `internal/lifecycle` | Turn off and uninstall |
+| `internal/server` | Localhost API and the request guard |
+| `internal/store` | Store types, load and save |
+| `skill/edward` | The agent skill, embedded in the binary |
+| `mock` | The page (React, Vite) |
+| `schema` | Contract and JSON schema for the store |
 
 ## License
 
-The license is not chosen yet.
-
-## In this repo
-
-| Path | Role |
-| --- | --- |
-| `internal/` | Collector, redaction, playbook, store, localhost server |
-| `schema/store.schema.json` | Store schema |
-| `mock/` | Page |
-| `skill/edward/SKILL.md` | Skill template |
-| `install/` | User LaunchAgent |
-| `media/mock/` | Fixture screenshots for this README |
+[Apache-2.0](LICENSE)

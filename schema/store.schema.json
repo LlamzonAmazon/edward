@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://edward.local/schema/store.json",
   "title": "EDwaRd store",
-  "description": "One JSON file. The collector writes it. The page and the agent read it. Do not add fields.",
+  "description": "One JSON file. The collector writes it. The page and the agent read it.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -48,6 +48,19 @@
       "type": "array",
       "items": { "$ref": "#/$defs/agentId" }
     },
+    "hookReport": {
+      "description": "What the last skill install did. One ~/path per entry.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["written", "removed", "left", "stripped", "errors"],
+      "properties": {
+        "written": { "type": "array", "items": { "type": "string" } },
+        "removed": { "type": "array", "items": { "type": "string" } },
+        "left": { "type": "array", "items": { "type": "string" } },
+        "stripped": { "type": "array", "items": { "type": "string" } },
+        "errors": { "type": "array", "items": { "type": "string" } }
+      }
+    },
     "agents": {
       "type": "array",
       "minItems": 4,
@@ -88,21 +101,7 @@
   },
   "$defs": {
     "agentId": {
-      "enum": [
-        "claude",
-        "cursor",
-        "codex",
-        "hermes",
-        "windsurf",
-        "copilot",
-        "gemini",
-        "cline",
-        "opencode",
-        "amp",
-        "roo",
-        "kiro",
-        "openclaw"
-      ]
+      "enum": ["claude", "codex", "cursor", "opencode", "openclaw", "hermes", "copilot"]
     },
     "sourceId": {
       "enum": ["processes", "connections", "files", "apps", "startup", "firewall", "policy", "logs"]
