@@ -1,0 +1,5 @@
+    1 /sbin/launchd
+  501 /Applications/Slack.app/Contents/MacOS/Slack
+  502 /Applications/Slack.app/Contents/Frameworks/Slack Helper.app/Contents/MacOS/Slack Helper --type=renderer
+  610 node server.js --token=abc123 --api-key sk-ant-api03-abcdefghijklmnopqrstuvwxyz
+  611 /usr/bin/ssh -p 2222 host

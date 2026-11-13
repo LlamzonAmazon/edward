@@ -33,9 +33,17 @@ func CollectProcesses(userName string) ([]Proc, []store.Item) {
 	if err != nil {
 		return nil, nil
 	}
+	cmdOut, _ := runCmd(5*time.Second, "/bin/ps", "-axo", "pid=,command=")
+	return parseProcesses(string(out), string(cmdOut), userName)
+}
+
+// parseProcesses turns `ps -axo pid=,ppid=,user=,etime=,comm=` and
+// `ps -axo pid=,command=` output into processes owned by userName, with
+// secrets in command lines redacted.
+func parseProcesses(out, cmdOut, userName string) ([]Proc, []store.Item) {
 	cmds := map[int]string{}
-	if cmdOut, err := runCmd(5*time.Second, "/bin/ps", "-axo", "pid=,command="); err == nil {
-		for _, line := range strings.Split(string(cmdOut), "\n") {
+	{
+		for _, line := range strings.Split(cmdOut, "\n") {
 			m := psCmd.FindStringSubmatch(line)
 			if m == nil {
 				continue
@@ -46,7 +54,7 @@ func CollectProcesses(userName string) ([]Proc, []store.Item) {
 	}
 	var procs []Proc
 	byPID := map[int]*Proc{}
-	for _, line := range strings.Split(string(out), "\n") {
+	for _, line := range strings.Split(out, "\n") {
 		m := psRow.FindStringSubmatch(line)
 		if m == nil {
 			continue

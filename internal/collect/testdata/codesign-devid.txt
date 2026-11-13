@@ -1,0 +1,9 @@
+Executable=/Applications/Example.app/Contents/MacOS/Example
+Identifier=com.example.app
+Format=app bundle with Mach-O universal (x86_64 arm64)
+CodeDirectory v=20500 size=1234 flags=0x10000(runtime) hashes=28+7 location=embedded
+Signature size=9000
+Authority=Developer ID Application: Example Corp (ABCDE12345)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+TeamIdentifier=ABCDE12345

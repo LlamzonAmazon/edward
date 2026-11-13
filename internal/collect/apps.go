@@ -184,27 +184,35 @@ func codesignStatus(path string) (unsigned, adhoc bool, authority string) {
 	signMu.Unlock()
 
 	out, err := runCmdCombined(12*time.Second, "/usr/bin/codesign", "-dvv", "--", path)
-	s := string(out)
-	low := strings.ToLower(s)
-	switch {
-	case strings.Contains(low, "code object is not signed") || strings.Contains(low, "not signed at all"):
-		unsigned = true
-	case strings.Contains(s, "Signature=adhoc") || strings.Contains(low, "(adhoc)"):
-		adhoc = true
-	default:
-		for _, line := range strings.Split(s, "\n") {
-			if strings.HasPrefix(line, "Authority=") && authority == "" {
-				authority = strings.TrimPrefix(line, "Authority=")
-			}
-		}
-		if err != nil && authority == "" && !strings.Contains(s, "CodeDirectory") && !strings.Contains(s, "TeamIdentifier=") {
-			return false, false, ""
-		}
+	unsigned, adhoc, authority, ok := parseCodesign(string(out), err != nil)
+	if !ok {
+		return false, false, ""
 	}
 	signMu.Lock()
 	signCache[path] = signCacheEntry{mtime: mtime, unsigned: unsigned, adhoc: adhoc, authority: authority}
 	signMu.Unlock()
 	return unsigned, adhoc, authority
+}
+
+// parseCodesign reads `codesign -dvv` output. ok is false when codesign failed
+// without saying anything about a signature (for example, a missing file).
+func parseCodesign(s string, failed bool) (unsigned, adhoc bool, authority string, ok bool) {
+	low := strings.ToLower(s)
+	switch {
+	case strings.Contains(low, "code object is not signed") || strings.Contains(low, "not signed at all"):
+		return true, false, "", true
+	case strings.Contains(s, "Signature=adhoc") || strings.Contains(low, "(adhoc)"):
+		return false, true, "", true
+	}
+	for _, line := range strings.Split(s, "\n") {
+		if strings.HasPrefix(line, "Authority=") && authority == "" {
+			authority = strings.TrimPrefix(line, "Authority=")
+		}
+	}
+	if failed && authority == "" && !strings.Contains(s, "CodeDirectory") && !strings.Contains(s, "TeamIdentifier=") {
+		return false, false, "", false
+	}
+	return false, false, authority, true
 }
 
 func shortAuthority(a string) string {

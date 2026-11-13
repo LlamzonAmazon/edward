@@ -30,26 +30,19 @@ func CollectConnections(userName string, uid string, procs []Proc) []store.Item 
 	for _, p := range procs {
 		uptime[p.PID] = p.EtimePretty
 	}
-	recs := parseLsof(string(out))
+	return connectionItems(parseLsof(string(out)), userName, uid, uptime)
+}
+
+// connectionItems turns lsof records into one item per program and address,
+// keeping only this user's sockets.
+func connectionItems(recs []connRec, userName, uid string, uptime map[int]string) []store.Item {
 	seen := map[string]bool{}
 	var items []store.Item
 	for _, r := range recs {
 		if uid != "" && r.uid != uid && r.uid != userName {
 			continue
 		}
-		dir := "Outbound"
-		if r.state == "LISTEN" {
-			dir = "Listening"
-		} else if !strings.Contains(r.name, "->") && (strings.HasPrefix(r.name, "*") || !strings.Contains(r.name, "->")) {
-			if r.state == "" || r.state == "Idle" || r.state == "CLOSED" {
-				if !strings.Contains(r.name, "->") {
-					dir = "Listening"
-				}
-			}
-		}
-		if strings.Contains(r.name, "->") {
-			dir = "Outbound"
-		}
+		dir := direction(r)
 		addr := displayAddr(r.name, dir)
 		id := "c-" + r.cmd + "-" + addr
 		if seen[id] {
@@ -109,6 +102,18 @@ func parseLsof(out string) []connRec {
 	}
 	flushName()
 	return recs
+}
+
+// direction is Outbound for a socket with a remote end, and Listening for a
+// socket bound only locally (a TCP LISTEN, or a UDP socket with no peer).
+func direction(r connRec) string {
+	switch {
+	case strings.Contains(r.name, "->"):
+		return "Outbound"
+	case r.state == "LISTEN", r.state == "", r.state == "Idle", r.state == "CLOSED":
+		return "Listening"
+	}
+	return "Outbound"
 }
 
 func displayAddr(name, dir string) string {

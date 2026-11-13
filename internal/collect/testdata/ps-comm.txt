@@ -1,0 +1,5 @@
+    1     0 root          10-02:03:04 /sbin/launchd
+  501     1 alice            02:03:04 /Applications/Slack.app/Contents/MacOS/Slack
+  502   501 alice               03:04 /Applications/Slack.app/Contents/Frameworks/Slack Helper.app/Contents/MacOS/Slack Helper
+  610     1 alice                  42 node
+  611     1 bob                 05:00 /usr/bin/ssh
