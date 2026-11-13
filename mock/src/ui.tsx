@@ -25,9 +25,14 @@ function contentKey(node: ReactNode): string {
   return "";
 }
 
+/**
+ * A token as a number: lengths in px, durations in ms. Durations need the unit:
+ * the build minifies 1600ms to 1.6s, so a bare parseFloat would read 1.6.
+ */
 export function token(name: string): number {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return parseFloat(raw) || 0;
+  const n = parseFloat(raw) || 0;
+  return raw.endsWith("ms") ? n : raw.endsWith("s") ? n * 1000 : n;
 }
 
 const paths: Record<IconName | "laptop" | "chevron" | "check" | "copy" | "close" | "agent" | "pause" | "play" | "arrow" | "undo" | "lock" | "settings" | "back", ReactNode> = {
