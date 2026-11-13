@@ -30,8 +30,10 @@ web:
 
 # app builds ./EDwaRd.app for this Mac. Then: sh install.sh
 app: web
-	go build -trimpath -ldflags "$(LDFLAGS)" -o .build/edward ./cmd/edward
-	$(call bundle,.build/edward,$(APP))
+	mkdir -p .build
+	rm -f .build/edward-native
+	go build -trimpath -ldflags "$(LDFLAGS)" -o .build/edward-native ./cmd/edward
+	$(call bundle,.build/edward-native,$(APP))
 
 # release builds the universal tarball and checksum that install.sh downloads.
 release: web

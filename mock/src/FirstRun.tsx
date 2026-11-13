@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { agentNames, askSketchy, askSurface } from "./data";
-import { CopyField, Icon, Swap, token, Wipe } from "./ui";
+import { CopyField, Icon, IconSwap, Swap, token, Wipe } from "./ui";
+
+const writeLabel = (n: number) => `Write to ${n} ${n === 1 ? "agent" : "agents"}`;
 import { AccessList, AgentPicks, Device, SkillPreview } from "./Setup";
 
 type Props = {
@@ -85,9 +87,9 @@ export function FirstRun({ agentIds, onAgents, onClose, onWritten }: Props) {
           </Wipe>
         )}
         {step === 2 && (
-          <Wipe tone="accent" done={written} swapKey={written ? "written" : "write"} disabled={!agentIds.length} onClick={write}>
-            <Icon name={written ? "check" : "arrow"} />
-            {written ? "Written" : `Write to ${agentIds.length} ${agentIds.length === 1 ? "agent" : "agents"}`}
+          <Wipe tone="accent" swapKey="write" reserve={[writeLabel(1), writeLabel(7)]} disabled={!agentIds.length} onClick={write}>
+            <IconSwap name={written ? "check" : "arrow"} icons={["arrow", "check"]} />
+            {writeLabel(agentIds.length)}
           </Wipe>
         )}
         {step === 3 && (

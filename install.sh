@@ -181,6 +181,13 @@ main() {
 
 	bundle=$(find_bundle)
 	[ -x "$bundle/Contents/MacOS/edward" ] || die "the bundle has no Contents/MacOS/edward"
+	# A build from before `edward version` existed would start a server here
+	# instead of printing; refuse it rather than install a stale app.
+	new_version=$("$bundle/Contents/MacOS/edward" version 2>/dev/null) || new_version=
+	case $new_version in
+	[0-9]*) ;;
+	*) die "$bundle is an old or broken build (edward version did not answer). Run make app again." ;;
+	esac
 
 	bootout_agent
 	mkdir -p "$APPDIR" "$LAUNCH_AGENTS" "$LOGDIR" "$HOME/.local/bin"
@@ -213,7 +220,7 @@ main() {
 	done
 
 	echo
-	echo "EDwaRd $("$BIN" version) is running: $PAGE"
+	echo "EDwaRd $new_version is running: $PAGE"
 	echo "Log:       $LOGDIR/edward.log"
 	echo "Uninstall: ~/.local/bin/edward uninstall"
 	case ":$PATH:" in

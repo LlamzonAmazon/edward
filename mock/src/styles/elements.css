@@ -34,6 +34,18 @@ input {
 }
 button {
   cursor: pointer;
+  transition: scale var(--dur-fast) var(--ease-out);
+}
+/* Press (principle 1, Response): every control scales down while pressed and
+   comes back on release. Nothing else changes on a click. It uses the
+   individual `scale` property so it composes with a component's own transform,
+   and every control's transition list includes `scale` so a press animates and
+   reverses from wherever it is. Large targets scale less. */
+:where(button, .agent-pick):not(:disabled):active {
+  scale: var(--press);
+}
+:where(.row__head, .agent-pick, .nav__item, .menu__item):not(:disabled):active {
+  scale: var(--press-large);
 }
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -270,7 +282,9 @@ dd {
 
 /* Wipe: the one hover behavior for every action that commits something.
    The label is rendered twice; the top copy is clipped in from the left edge.
-   Label text changes also Swap inside so Copy → Copied (and Pause → Resume) wipe. */
+   A click changes nothing but the press scale and, for a confirmation, the
+   icon (CopyButton: copy becomes check). Labels change only for a real state
+   change (Pause and Resume), inside a Swap that reserves the widest label. */
 .wipe {
   --w-bg: var(--accent);
   --w-fg: var(--on-accent);
@@ -290,7 +304,7 @@ dd {
   color: var(--w-fg);
   font-weight: var(--weight-strong);
   white-space: nowrap;
-  transition: transform var(--dur-fast) var(--ease-out);
+  transition: scale var(--dur-fast) var(--ease-out);
 }
 .wipe__face {
   gap: var(--space-2);
@@ -307,6 +321,8 @@ dd {
   color: var(--w-fg-hover);
   clip-path: inset(0 100% 0 0);
   transition: clip-path var(--dur-base) var(--ease-out);
+  /* Visual only: the pointer always targets the button, never this layer. */
+  pointer-events: none;
 }
 .wipe__layer .wipe__face {
   width: 100%;
@@ -314,12 +330,8 @@ dd {
   justify-content: inherit;
 }
 .wipe:hover .wipe__layer,
-.wipe:focus-visible .wipe__layer,
-.wipe[data-done="true"] .wipe__layer {
+.wipe:focus-visible .wipe__layer {
   clip-path: inset(0 0 0 0);
-}
-.wipe:active {
-  transform: scale(var(--press));
 }
 .wipe:disabled {
   cursor: not-allowed;
@@ -376,14 +388,11 @@ dd {
   border-radius: var(--radius-s);
   color: var(--fg-muted);
   transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out),
-    transform var(--dur-fast) var(--ease-out);
+    scale var(--dur-fast) var(--ease-out);
 }
 .icon-btn:hover {
   background: var(--ink-900);
   color: var(--white);
-}
-.icon-btn:active {
-  transform: scale(var(--press));
 }
 
 /* Text field: label above, field, optional trailing button outside it */
@@ -426,4 +435,46 @@ dd {
 .field__input::placeholder {
   color: var(--fg-muted);
   font-weight: var(--weight-body);
+}
+
+/* Swap reserve: hidden copies of every label a slot can show, in the same grid
+   cell as the visible one, so the slot keeps the widest label's size. */
+.swap__reserve {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+}
+.swap--block .swap__reserve {
+  display: block;
+}
+
+/* IconSwap: icons stacked in one cell; only the current one shows. Opacity and
+   scale are transitions, so a second change reverses mid-way. */
+.icon-swap {
+  display: inline-grid;
+  flex: none;
+}
+.icon-swap__icon {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  scale: 0.6;
+  transition: opacity var(--dur-fast) var(--ease-out), scale var(--dur-fast) var(--ease-out);
+}
+.icon-swap__icon[data-on="true"] {
+  opacity: 1;
+  scale: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

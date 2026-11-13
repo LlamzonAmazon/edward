@@ -163,86 +163,101 @@ export function Icon({ name }: { name: AnyIcon }) {
 }
 
 /**
- * In-place content wipe. Same left-to-right clip as Wipe, for titles, details,
- * and any label that changes without unmounting the parent.
- * Pass swapKey when children update often (tickers) but should only wipe on real state changes.
+ * In-place content wipe for a real state change (a title, Pause and Resume).
+ * Old content clips away left to right while new content clips in.
+ *
+ * - Size: pass `reserve` with every label the slot can show. They are laid out
+ *   hidden in the same cell, so the slot is always as wide as the widest one
+ *   and nothing around it moves when the label changes.
+ * - Interruptible: a change that arrives mid-wipe finishes the running wipe at
+ *   once and starts the next one from there. Nothing queues.
+ * - Pass swapKey when children update often (tickers) but should only wipe on
+ *   real state changes.
  */
 export function Swap({
   children,
   swapKey,
   block,
+  reserve,
   className = "",
 }: {
   children: ReactNode;
   swapKey?: string | number | boolean;
   block?: boolean;
+  reserve?: ReactNode[];
   className?: string;
 }) {
   const key = swapKey !== undefined ? String(swapKey) : contentKey(children);
   const reduce = useReducedMotion();
-  const [current, setCurrent] = useState(children);
-  const [currentKey, setCurrentKey] = useState(key);
-  const [incoming, setIncoming] = useState<ReactNode>(null);
-  const [incomingKey, setIncomingKey] = useState(key);
+  const [current, setCurrent] = useState<{ key: string; node: ReactNode }>({ key, node: children });
+  const [incoming, setIncoming] = useState<{ key: string; node: ReactNode } | null>(null);
   const [phase, setPhase] = useState<"idle" | "prep" | "go">("idle");
-  const finishRef = useRef<() => void>(() => {});
 
   useEffect(() => {
-    if (key === currentKey && phase === "idle") {
-      setCurrent(children);
+    if (incoming && key === incoming.key) {
+      if (incoming.node !== children) setIncoming({ key, node: children });
+      return;
     }
-  }, [children, key, currentKey, phase]);
-
-  useEffect(() => {
-    if (key === currentKey) return;
+    if (!incoming && key === current.key) {
+      if (current.node !== children) setCurrent({ key, node: children });
+      return;
+    }
+    // A new state. If a wipe is running, its target becomes the base at once.
+    if (incoming) setCurrent(incoming);
     if (reduce) {
-      setCurrent(children);
-      setCurrentKey(key);
+      setCurrent({ key, node: children });
       setIncoming(null);
       setPhase("idle");
       return;
     }
-    setIncoming(children);
-    setIncomingKey(key);
+    setIncoming({ key, node: children });
     setPhase("prep");
-  }, [key, children, currentKey, reduce]);
+  }, [key, children, reduce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (phase !== "prep") return;
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setPhase("go"));
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setPhase("go"));
     });
-    return () => cancelAnimationFrame(id);
-  }, [phase]);
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [phase, incoming]);
 
   const finish = () => {
-    if (phase !== "go") return;
+    if (!incoming) return;
     setCurrent(incoming);
-    setCurrentKey(incomingKey);
     setIncoming(null);
     setPhase("idle");
   };
+  const finishRef = useRef(finish);
   finishRef.current = finish;
 
   useEffect(() => {
     if (phase !== "go") return;
-    const ms = token("--dur-base") + 80;
-    const id = window.setTimeout(() => finishRef.current(), ms);
+    // Fallback for a transitionend that never fires (tab hidden, element detached).
+    const id = window.setTimeout(() => finishRef.current(), token("--dur-base") + 80);
     return () => window.clearTimeout(id);
-  }, [phase]);
+  }, [phase, incoming]);
 
   const onLayerEnd = (e: TransitionEvent<HTMLSpanElement>) => {
-    if (e.propertyName !== "clip-path") return;
-    if (e.target !== e.currentTarget) return;
+    if (e.propertyName !== "clip-path" || e.target !== e.currentTarget) return;
     finish();
   };
 
   return (
-    <span className={["swap", block ? "swap--block" : "", className].filter(Boolean).join(" ")} data-phase={phase === "go" ? "go" : phase === "prep" ? "prep" : "idle"}>
-      <span className="swap__base">{current}</span>
-      {incoming != null && (
-        <span className="swap__layer" onTransitionEnd={onLayerEnd}>
-          {incoming}
+    <span className={["swap", block ? "swap--block" : "", className].filter(Boolean).join(" ")} data-phase={phase}>
+      {reserve?.map((r, i) => (
+        <span key={`r${i}`} className="swap__reserve" aria-hidden>
+          {r}
+        </span>
+      ))}
+      <span className="swap__base">{current.node}</span>
+      {incoming && (
+        <span key={incoming.key} className="swap__layer" onTransitionEnd={onLayerEnd}>
+          {incoming.node}
         </span>
       )}
     </span>
@@ -253,7 +268,6 @@ type WipeProps = {
   tone?: "accent" | "flag" | "quiet";
   size?: "s" | "m";
   block?: boolean;
-  done?: boolean;
   disabled?: boolean;
   className?: string;
   onClick?: () => void;
@@ -261,25 +275,26 @@ type WipeProps = {
   onMouseLeave?: () => void;
   children: ReactNode;
   label?: string;
-  /** When set, label Swap only fires when this changes (plus done). */
+  /** When set, the label Swap only fires when this changes. */
   swapKey?: string | number | boolean;
+  /** Every label this button can show, so its width never changes. */
+  reserve?: ReactNode[];
 };
 
-export function Wipe({ tone = "accent", size = "m", block, done, disabled, className = "", onClick, onMouseEnter, onMouseLeave, children, label, swapKey }: WipeProps) {
+export function Wipe({ tone = "accent", size = "m", block, disabled, className = "", onClick, onMouseEnter, onMouseLeave, children, label, swapKey, reserve }: WipeProps) {
   const cls = ["wipe", `tone-${tone}`, size === "s" ? "wipe--s" : "", block ? "wipe--block" : "", className].join(" ");
-  const key = swapKey !== undefined ? `${swapKey}:${done ? "1" : "0"}` : undefined;
+  // The label is drawn twice (rest face and hover layer). Both Swaps get the same
+  // key and reserve in the same render, so they change on the same frame.
   const face = (
-    <Swap className="wipe__face" swapKey={key}>
+    <Swap className="wipe__face" swapKey={swapKey} reserve={reserve}>
       {children}
     </Swap>
   );
   return (
-    <button className={cls} data-done={done ? "true" : undefined} disabled={disabled} onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} aria-label={label}>
+    <button className={cls} disabled={disabled} onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} aria-label={label}>
       {face}
       <span className="wipe__layer" aria-hidden>
-        <Swap className="wipe__face" swapKey={key}>
-          {children}
-        </Swap>
+        {face}
       </span>
     </button>
   );
@@ -391,19 +406,47 @@ export function useEscape(onEsc: () => void, active: boolean) {
   }, [active, onEsc]);
 }
 
+/**
+ * Copy: on click the button presses, the copy icon becomes a check for
+ * --dur-hold, then goes back. The label and size never change. Another click
+ * during the hold copies again and restarts the hold.
+ */
 export function CopyButton({ text, tone = "accent", size = "m", label = "Copy", onCopied }: { text: string; tone?: WipeProps["tone"]; size?: WipeProps["size"]; label?: string; onCopied?: () => void }) {
   const [copied, setCopied] = useState(false);
+  const timer = useRef(0);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
   const click = () => {
     navigator.clipboard?.writeText(text).catch(() => {});
     setCopied(true);
     onCopied?.();
-    window.setTimeout(() => setCopied(false), token("--dur-hold"));
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setCopied(false), token("--dur-hold"));
   };
   return (
-    <Wipe tone={tone} size={size} done={copied} swapKey={copied ? "copied" : "idle"} onClick={click}>
-      <Icon name={copied ? "check" : "copy"} />
-      {copied ? "Copied" : label}
+    <Wipe tone={tone} size={size} onClick={click} swapKey="label">
+      <IconSwap name={copied ? "check" : "copy"} icons={["copy", "check"]} />
+      {label}
+      <span className="sr-only" aria-live="polite">
+        {copied ? "Copied" : ""}
+      </span>
     </Wipe>
+  );
+}
+
+/**
+ * An icon that changes in place (copy to check, arrow to check). Every icon in
+ * `icons` sits in the same one-icon cell, so nothing moves. The old icon scales
+ * out as the new one scales in, and a change mid-way reverses from where it is.
+ */
+export function IconSwap({ name, icons }: { name: AnyIcon; icons: AnyIcon[] }) {
+  return (
+    <span className="icon-swap">
+      {icons.map((n) => (
+        <span key={n} className="icon-swap__icon" data-on={n === name}>
+          <Icon name={n} />
+        </span>
+      ))}
+    </span>
   );
 }
 

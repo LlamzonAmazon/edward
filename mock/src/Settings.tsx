@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { agentNames, categories, Finding } from "./data";
-import { Icon, Swap, Wipe } from "./ui";
+import { Icon, IconSwap, Swap, Wipe } from "./ui";
 import { AccessList, AgentPicks, Device } from "./Setup";
 import { useSurface } from "./surface";
 import type { FindingState } from "./App";
@@ -137,6 +137,7 @@ export function Settings(props: Props) {
                           title={paused ? "Resume looking" : "Pause looking"}
                           detail={paused ? "Collectors are stopped. Click to start them again." : "Stop collectors only. The program stays running. Same as Looking / Paused in the sidebar."}
                           action={paused ? "Resume" : "Pause"}
+                          reserve={["Resume", "Pause"]}
                           swapKey={paused ? "paused" : "looking"}
                           onClick={() => {
                             onPause();
@@ -221,7 +222,7 @@ export function Settings(props: Props) {
   );
 }
 
-function StopChoice({ title, detail, action, swapKey, onClick }: { title: string; detail: string; action: string; swapKey?: string; onClick: () => void }) {
+function StopChoice({ title, detail, action, swapKey, reserve, onClick }: { title: string; detail: string; action: string; swapKey?: string; reserve?: string[]; onClick: () => void }) {
   return (
     <div className="row">
       <div className="row__head" style={{ cursor: "default" }}>
@@ -235,7 +236,7 @@ function StopChoice({ title, detail, action, swapKey, onClick }: { title: string
             </Swap>
           </span>
         </span>
-        <Wipe tone="quiet" size="s" swapKey={swapKey ?? action} onClick={onClick}>
+        <Wipe tone="quiet" size="s" swapKey={swapKey ?? action} reserve={reserve} onClick={onClick}>
           {action}
         </Wipe>
       </div>
@@ -282,9 +283,9 @@ function AgentNotes({ agentIds, context, onContext }: Props) {
         placeholder={"Port 3000 is always my dev server.\nIgnore anything in ~/scratch."}
       />
       <div>
-        <Wipe tone="accent" done={!changed && !!context} swapKey={!changed && context ? "saved" : "save"} disabled={!changed}>
-          <Icon name="check" />
-          {!changed && context ? `Saved for ${agentNames(agentIds)}` : `Save for ${agentNames(agentIds)}`}
+        <Wipe tone="accent" swapKey="save" disabled={!changed}>
+          <IconSwap name={!changed && context ? "check" : "arrow"} icons={["arrow", "check"]} />
+          {`Save for ${agentNames(agentIds)}`}
         </Wipe>
       </div>
     </form>

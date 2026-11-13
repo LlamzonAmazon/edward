@@ -2,7 +2,7 @@ import { useState } from "react";
 import { access, filesPrompt, skillBody } from "./data";
 import { openPrivacy } from "./api";
 import { useSurface } from "./surface";
-import { Icon, Toggle, Wipe } from "./ui";
+import { Icon, IconSwap, Toggle, Wipe } from "./ui";
 
 export function AgentPicks({ agentIds, onAgents }: { agentIds: string[]; onAgents: (ids: string[]) => void }) {
   const { agents } = useSurface();
@@ -80,15 +80,13 @@ export function AccessList() {
             <Wipe
               tone="quiet"
               size="s"
-              done={opened.includes(a.id)}
-              swapKey={opened.includes(a.id) ? "waiting" : "open"}
               onClick={() => {
                 setOpened([...opened, a.id]);
                 void openPrivacy("fda").catch(() => {});
               }}
             >
-              <Icon name={opened.includes(a.id) ? "check" : "arrow"} />
-              {opened.includes(a.id) ? "Waiting for the switch" : "Open System Settings"}
+              <IconSwap name={opened.includes(a.id) ? "check" : "arrow"} icons={["arrow", "check"]} />
+              Open System Settings
             </Wipe>
           ) : (
             <span className="access__state">Not in v1</span>
