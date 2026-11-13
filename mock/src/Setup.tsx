@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { access, filesPrompt, sentence, skillBody, store } from "./data";
+import { access, filesPrompt, skillBody } from "./data";
 import { openPrivacy } from "./api";
 import { useSurface } from "./surface";
 import { Icon, Toggle, Wipe } from "./ui";
@@ -101,33 +101,19 @@ export function AccessList() {
 
 export function SkillPreview({ agentIds }: { agentIds: string[] }) {
   const { agents } = useSurface();
-  const chosen = agents.filter((a) => agentIds.includes(a.id));
+  // Codex, Cursor, OpenCode and OpenClaw share one file, so list each path once.
+  const paths = [...new Set(agents.filter((a) => agentIds.includes(a.id)).map((a) => a.skill))];
+  if (paths.length === 0) return null;
   return (
-    <div>
-      {chosen
-        .filter((a) => a.always)
-        .map((a) => (
-          <div key={a.id} className="preview">
-            <span className="preview__file">{a.always}</span>
-            <span>{"<!-- edward:start -->"}</span>
-            <span>
-              {sentence} Its page is on port {store.port}, and its skill is at {a.skill}.
-            </span>
-            <span>{"<!-- edward:end -->"}</span>
-          </div>
-        ))}
-      {chosen.length > 0 && (
-        <div className="preview">
-          {chosen.map((a) => (
-            <span key={a.id} className="preview__file">
-              {a.skill}
-            </span>
-          ))}
-          {skillBody.map((line, i) => (
-            <span key={i}>{line}</span>
-          ))}
-        </div>
-      )}
+    <div className="preview">
+      {paths.map((p) => (
+        <span key={p} className="preview__file">
+          {p}
+        </span>
+      ))}
+      {skillBody.map((line, i) => (
+        <span key={i}>{line}</span>
+      ))}
     </div>
   );
 }

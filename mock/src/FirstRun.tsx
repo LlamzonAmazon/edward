@@ -49,7 +49,7 @@ export function FirstRun({ agentIds, onAgents, onClose, onWritten }: Props) {
           )}
           {step === 2 && (
             <>
-              <p className="muted">One sentence goes where your agent always looks. The rest is a skill it loads only when you ask.</p>
+              <p className="muted">EDwaRd adds one skill file. Your agent loads it when you ask about this Mac. EDwaRd does not edit your agent’s other settings or instruction files.</p>
               <SkillPreview agentIds={agentIds} />
             </>
           )}
