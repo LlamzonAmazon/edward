@@ -362,9 +362,9 @@ export const sources: Source[] = [
     name: "Starts at login",
     icon: "startup",
     collected: true,
-    looksAt: "Everything set to start when you log in: LaunchAgents, login items, and your crontab.",
-    feed: "~/Library/LaunchAgents, login items, and crontab -l, read as you every 10 minutes.",
-    tileFeed: "LaunchAgents, login items · 10 min",
+    looksAt: "Programs set to start when you log in from your LaunchAgents folder.",
+    feed: "~/Library/LaunchAgents, read as you every 10 minutes.",
+    tileFeed: "LaunchAgents · 10 min",
     items: startup,
   },
   {

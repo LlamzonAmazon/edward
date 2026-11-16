@@ -20,7 +20,7 @@ What it defends against:
 | A tampered or truncated download | The installer checks the release tarball against `SHA256SUMS` and installs nothing on a mismatch. Both files come from the same GitHub release, so this does not protect against a compromised GitHub account or repository. |
 | EDwaRd overwrites or deletes your files | EDwaRd writes only its own skill files and marks them `edward-managed`. It never overwrites or deletes a `SKILL.md` without that marker. Uninstall removes only what EDwaRd created. |
 
-What it does not see: other users' processes, programs that run for less than one collection interval, file contents, the firewall's rules, device management profiles and protected logs. The release app is ad-hoc signed and not notarized by Apple.
+What it does not see: other users' processes, login items added in System Settings, programs that run for less than one collection interval, file contents, the firewall's rules, device management profiles and protected logs. The release app is ad-hoc signed and not notarized by Apple.
 
 ## Data
 

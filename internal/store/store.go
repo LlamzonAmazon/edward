@@ -197,9 +197,9 @@ func SeedSources() []Source {
 		},
 		{
 			ID: "startup", Name: "Starts at login", Icon: "startup", Collected: false,
-			LooksAt:  "Everything set to start when you log in: LaunchAgents, login items, and your crontab.",
-			Feed:     "~/Library/LaunchAgents, login items, and crontab -l, read as you every 10 minutes.",
-			TileFeed: "LaunchAgents, login items · 10 min",
+			LooksAt:  "Programs set to start when you log in from your LaunchAgents folder.",
+			Feed:     "~/Library/LaunchAgents, read as you every 10 minutes.",
+			TileFeed: "LaunchAgents · 10 min",
 			Items:    []Item{},
 		},
 		{

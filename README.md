@@ -12,7 +12,7 @@ EDwaRd shows what is running, listening and starting at login on your Mac, and l
 curl -fsSL https://raw.githubusercontent.com/LlamzonAmazon/edward/main/install.sh | sh
 ```
 
-macOS 13 Ventura or later, Apple Silicon or Intel. No sudo, no password, no account.
+macOS 13 Ventura or later, Apple Silicon or Intel. No sudo, no password, no account. The app is ad-hoc signed and not notarized by Apple, so install it with the command above: Gatekeeper blocks a copy downloaded in a browser.
 
 The script downloads the latest release, checks its SHA-256 against the release's `SHA256SUMS`, installs `EDwaRd.app` to `~/Library/Application Support/EDwaRd`, adds a login item, links `~/.local/bin/edward`, and opens the page. Read [install.sh](install.sh) first if you want to see each step.
 
@@ -29,9 +29,9 @@ EDwaRd lists what a normal user on this Mac can already see, every few seconds:
 | Source | How often | What |
 | --- | --- | --- |
 | Running programs | every 5 seconds | name, path, parent, uptime, for your user |
-| Network | every 5 seconds | TCP and UDP listeners and outbound connections |
+| Network | every 15 seconds | TCP and UDP listeners, and inbound and outbound connections |
 | Apps | every 10 minutes | `/Applications`, `~/Applications`, Homebrew; version and code signature |
-| Starts at login | every 10 minutes | your LaunchAgents and login items |
+| Starts at login | every 10 minutes | your LaunchAgents in `~/Library/LaunchAgents` |
 | New files | every minute, off until you turn it on | names, sizes and times in Downloads, Desktop and `/tmp` |
 
 Six rules raise findings from each snapshot:
@@ -51,7 +51,7 @@ Each finding shows why it might matter and why it might be fine. You clear it, l
 
 ## What it does not do
 
-EDwaRd is not antivirus. It has no kernel sensor, no signatures and no blocking, and it cannot tell you whether a file is malicious. It polls snapshots, so a program that runs for less than a few seconds may never appear. It cannot see other users' processes, the firewall's rules, device management profiles or protected logs.
+EDwaRd is not antivirus. It has no kernel sensor, no signatures and no blocking, and it cannot tell you whether a file is malicious. It polls snapshots, so a program that runs for less than a few seconds may never appear. It cannot see other users' processes, login items added in System Settings (macOS keeps them where only root can read), the firewall's rules, device management profiles or protected logs.
 
 It never reads environment variables, SSH keys, keychains, browser profiles, mail, documents or file contents. Secrets in command lines (tokens, API keys, passwords in URLs) are redacted before anything is written.
 
