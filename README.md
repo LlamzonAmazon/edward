@@ -36,7 +36,7 @@ EDwaRd lists what a normal user on this Mac can already see, every few seconds:
 
 Six rules raise findings from each snapshot:
 
-1. **Open to your network:** a program listening on an address other than loopback.
+1. **Open to your network:** a program listening on an address other than loopback. A program's UDP sockets on temporary ports become one finding when the running process passes a signature check for Apple or Developer ID code; any other UDP socket is raised on its own. A socket bound to an address the Mac no longer has raises nothing.
 2. **Unknown connection:** an outbound connection to a raw IP, on a port other than 22, 53, 80 or 443.
 3. **Running from a hidden folder:** a path with a segment that starts with `.`.
 4. **Unsigned app:** an app that `codesign` reports as unsigned or ad-hoc signed.

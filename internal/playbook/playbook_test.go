@@ -1,6 +1,7 @@
 package playbook
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/LlamzonAmazon/edward/internal/store"
@@ -121,5 +122,30 @@ func TestUnsignedOnlyAppBundles(t *testing.T) {
 	out := Evaluate(Input{Apps: []store.Item{keg, app, word}})
 	if len(out.Findings) != 1 || out.Findings[0].ItemID != app.ID {
 		t.Fatalf("only unsigned .app bundles should raise, got %#v", out.Findings)
+	}
+}
+
+func udpConn(name, addr string, extra ...[]string) store.Item {
+	c := conn(name, addr, "Listening")
+	c.Facts = append(c.Facts, []string{"Protocol", "UDP"}, []string{FactPortRange, PortTemporary})
+	c.Facts = append(c.Facts, extra...)
+	return c
+}
+
+func TestUDPGroupingNeedsEveryFact(t *testing.T) {
+	signed := []string{FactSignedBy, "Example Inc (ABCDE12345)"}
+	cases := map[string]store.Item{
+		"no executable":     udpConn("helper", "*:60001", signed),
+		"hidden executable": udpConn("helper", "*:60002", signed, []string{FactExecutable, "/Users/a/.cache/helper"}),
+		"unverified":        udpConn("helper", "*:60003", []string{FactSignedBy, SignerUnverified}, []string{FactExecutable, "/Applications/H.app/Contents/MacOS/helper"}),
+	}
+	tcp := conn("helper", "*:60004", "Listening")
+	tcp.Facts = append(tcp.Facts, []string{"Protocol", "TCP"}, []string{FactPortRange, PortTemporary}, signed, []string{FactExecutable, "/Applications/H.app/Contents/MacOS/helper"})
+	cases["tcp"] = tcp
+	for name, c := range cases {
+		res := Evaluate(Input{Connections: []store.Item{c}})
+		if len(res.Findings) != 1 || !strings.HasSuffix(res.Findings[0].Value, "on port "+strings.TrimPrefix(c.Detail, "*:")) {
+			t.Fatalf("%s: want one finding for the socket itself, got %#v", name, res.Findings)
+		}
 	}
 }

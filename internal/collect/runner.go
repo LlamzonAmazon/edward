@@ -25,6 +25,7 @@ type Runner struct {
 	lastFiles        time.Time
 	lastConns        time.Time
 	cachedConns      []store.Item
+	cachedConnPIDs   map[string]int
 	startupBaselined bool
 	filesBaselined   bool
 	readDir          func(string) ([]os.DirEntry, error)
@@ -99,15 +100,18 @@ func (r *Runner) Tick() {
 	hostName, osName, user := CollectHost()
 	procs, procItems := CollectProcesses(userName)
 	var connItems []store.Item
+	var connPIDs map[string]int
 	if r.lastConns.IsZero() || now.Sub(r.lastConns) >= 15*time.Second {
-		connItems = CollectConnections(userName, uid, procs)
+		connItems, connPIDs = CollectConnections(userName, uid, procs)
 		r.lastConns = now
 		r.cachedConns = connItems
+		r.cachedConnPIDs = connPIDs
 	} else {
 		connItems = r.cachedConns
+		connPIDs = r.cachedConnPIDs
 	}
 	meta := processMeta(procs)
-	attachConnMeta(connItems, procs, meta)
+	attachConnMeta(connItems, connPIDs, procs, meta)
 
 	r.mu.Lock()
 	sameFast := itemsKey(sourceItems(r.store, "processes")) == itemsKey(procItems) &&

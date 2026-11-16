@@ -60,7 +60,7 @@ POST `{ "on": false }`: `filesOn: false`. Leave `filesGrant` as `allowed` or `de
 Run as the installing user. No shell. Fixed argument lists. `LANG=C`. Timeouts on every command.
 
 - Processes, every 5s: `/bin/ps` `-axo` `pid=,ppid=,user=,etime=,comm=`. Command line from `/bin/ps` `-axo` `pid=,command=` for the current user only. Redact before store. Item id: `p-{name}-{path}`. Facts: Path, User, Started by, Up for.
-- Connections, every 15s: `/usr/sbin/lsof` `-nP` `-iTCP` `-iUDP` `-FpcunT`. Item id: `c-{name}-{address}`. Facts: Program, Address, Direction (`Listening`, `Inbound` or `Outbound`; `Inbound` is a connected socket on a port this user listens on, shown as `{peer host} → :{port}`), Open for. Listen address `*` means all interfaces.
+- Connections, every 15s: `/usr/sbin/lsof` `-nP` `-iTCP` `-iUDP` `-FpcunPT`. Item id: `c-{name}-{address}`. Facts: Program, Address, Direction (`Listening`, `Inbound` or `Outbound`; `Inbound` is a connected socket on a port this user listens on, shown as `{peer host} → :{port}`), Open for, Protocol, and the trust facts under the `exposed` rule. Listen address `*` means all interfaces.
 - Apps, every 10 min: list `/Applications`, `$HOME/Applications`, Homebrew prefix (`/opt/homebrew/opt` or `/usr/local/opt`). Read each app `Info.plist` with `howett.net/plist`. Signature via `/usr/bin/codesign` `-dv` `--` `{path}` (local only). Item id: `a-{name}`. Facts: Path, Version, From.
 - Startup, every 10 min: `$HOME/Library/LaunchAgents` plists only. macOS 13 and later keep login items in a root-only store, so they are not read. Item id: `s-{name}`. Facts: Kind, Runs.
 - Files, every 60s, only when `filesOn`: list those three directories. Do not walk. Do not hash. Do not read contents. Kind from extension and mode. Item id: `f-{path}`. Facts: Path, Kind, Saved.
@@ -77,7 +77,7 @@ Evaluate in code after each snapshot. A finding id is stable: `{category}-{dismi
 
 Raise whenever the state is true (unless dismissed):
 
-1. `exposed`: listening on an address that is not `127.0.0.1` or `::1`. Value like `node on port 3000`.
+1. `exposed`: listening on an address that is not `127.0.0.1` or `::1`. Value like `node on port 3000`. UDP sockets with no peer carry trust facts, because lsof shows a UDP client and a UDP server the same way: `Bound to` = `An address this Mac no longer has` raises nothing; on a port at or above `net.inet.ip.portrange.first`, `Port range` = `Temporary` and `Signed by` is the signer when `codesign --verify --strict -R=<Apple or Developer ID>` passes for the PID (the running process, so a file replaced after launch fails), else `Not verified`. Sockets with a verified signer, a temporary port and an `Executable` outside hidden folders are grouped into one finding per program, signer and user, value like `Chrome Helper has 9 UDP sockets on temporary ports`, with no port in its id. Every other socket is raised on its own. Connections are linked to processes by PID, never by name.
 2. `unknownAddress`: outbound to a raw IPv4/IPv6 with no hostname, port not in {22, 53, 80, 443}. Value like `updater → 91.215.85.17:8443`.
 3. `hidden`: process path contains a path segment that starts with `.` (hidden folder). Value is the process name.
 4. `unsigned`: app whose codesign says no signature or ad-hoc. Value is the app name.

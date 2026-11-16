@@ -13,29 +13,34 @@ type connRec struct {
 	pid   int
 	cmd   string
 	uid   string
+	proto string
 	name  string
 	state string
 }
 
-func CollectConnections(userName string, uid string, procs []Proc) []store.Item {
-	args := []string{"-nP", "-iTCP", "-iUDP", "-FpcunT"}
+// CollectConnections returns one item per program and address, and the PID
+// behind each item, so callers link an item to its process by PID. Process
+// names are set by the program itself and cannot identify it.
+func CollectConnections(userName string, uid string, procs []Proc) ([]store.Item, map[string]int) {
+	args := []string{"-nP", "-iTCP", "-iUDP", "-FpcunPT"}
 	if userName != "" {
-		args = []string{"-nP", "-iTCP", "-iUDP", "-a", "-u", userName, "-FpcunT"}
+		args = []string{"-nP", "-iTCP", "-iUDP", "-a", "-u", userName, "-FpcunPT"}
 	}
 	out, err := runCmd(10*time.Second, "/usr/sbin/lsof", args...)
 	if err != nil {
-		return []store.Item{}
+		return []store.Item{}, map[string]int{}
 	}
-	uptime := map[int]string{}
+	byPID := map[int]Proc{}
 	for _, p := range procs {
-		uptime[p.PID] = p.EtimePretty
+		byPID[p.PID] = p
 	}
-	return connectionItems(parseLsof(string(out)), userName, uid, uptime)
+	return connectionItems(parseLsof(string(out)), userName, uid, byPID, time.Now())
 }
 
 // connectionItems turns lsof records into one item per program and address,
-// keeping only this user's sockets.
-func connectionItems(recs []connRec, userName, uid string, uptime map[int]string) []store.Item {
+// keeping only this user's sockets. UDP sockets with no peer get trust facts
+// (see udpTrust) because lsof cannot tell a UDP server from a client.
+func connectionItems(recs []connRec, userName, uid string, procs map[int]Proc, now time.Time) ([]store.Item, map[string]int) {
 	var mine []connRec
 	for _, r := range recs {
 		if uid != "" && r.uid != uid && r.uid != userName {
@@ -44,43 +49,65 @@ func connectionItems(recs []connRec, userName, uid string, uptime map[int]string
 		mine = append(mine, r)
 	}
 	listening := listeningPorts(mine)
-	seen := map[string]bool{}
+	local := localAddrs()
+	first := ephemeralFirst()
+	index := map[string]int{}
+	pids := map[string]int{}
+	alive := map[int]bool{}
 	var items []store.Item
 	for _, r := range mine {
+		alive[r.pid] = true
 		dir := direction(r, listening)
 		addr := displayAddr(r.name, dir)
 		id := "c-" + r.cmd + "-" + addr
-		if seen[id] {
+		var trust [][]string
+		if r.proto == "UDP" && dir == "Listening" {
+			trust = udpTrust(r, procs[r.pid], local, first, now)
+		}
+		if i, ok := index[id]; ok {
+			// Two processes with one name on one address: keep the weaker
+			// trust, so an unverified process is never covered by a verified one.
+			if verified(trust) || !verified(items[i].Facts) {
+				continue
+			}
+			items[i].Facts = append(withoutTrust(items[i].Facts), trust...)
+			pids[id] = r.pid
 			continue
 		}
-		seen[id] = true
-		open := uptime[r.pid]
+		index[id] = len(items)
+		pids[id] = r.pid
+		facts := [][]string{
+			{"Program", r.cmd},
+			{"Address", addr},
+			{"Direction", dir},
+			{"Open for", procs[r.pid].EtimePretty},
+		}
+		if r.proto != "" {
+			facts = append(facts, []string{"Protocol", r.proto})
+		}
 		items = append(items, store.Item{
 			ID:     id,
 			Name:   r.cmd,
 			Detail: addr,
 			Meta:   dir,
-			Facts: [][]string{
-				{"Program", r.cmd},
-				{"Address", addr},
-				{"Direction", dir},
-				{"Open for", open},
-			},
+			Facts:  append(facts, trust...),
 		})
 	}
-	return items
+	pruneSigners(alive)
+	return items, pids
 }
 
+// parseLsof reads `lsof -F` output. Each file starts with an f line, and its
+// P (protocol) line comes before its n (address) line, so a record is
+// written out when the next file or process starts.
 func parseLsof(out string) []connRec {
 	var recs []connRec
 	var cur connRec
-	flushName := func() {
-		if cur.pid == 0 || cur.name == "" {
-			return
+	flush := func() {
+		if cur.pid != 0 && cur.name != "" {
+			recs = append(recs, cur)
 		}
-		recs = append(recs, cur)
-		cur.name = ""
-		cur.state = ""
+		cur = connRec{pid: cur.pid, cmd: cur.cmd, uid: cur.uid}
 	}
 	for _, line := range strings.Split(out, "\n") {
 		if line == "" {
@@ -89,15 +116,18 @@ func parseLsof(out string) []connRec {
 		tag, val := line[0], line[1:]
 		switch tag {
 		case 'p':
-			flushName()
+			flush()
 			cur = connRec{}
 			cur.pid, _ = strconv.Atoi(val)
 		case 'c':
 			cur.cmd = val
 		case 'u':
 			cur.uid = val
+		case 'f':
+			flush()
+		case 'P':
+			cur.proto = val
 		case 'n':
-			flushName()
 			cur.name = val
 		case 'T':
 			if strings.HasPrefix(val, "ST=") {
@@ -105,7 +135,7 @@ func parseLsof(out string) []connRec {
 			}
 		}
 	}
-	flushName()
+	flush()
 	return recs
 }
 
@@ -172,16 +202,20 @@ func displayAddr(name, dir string) string {
 	return name
 }
 
-func attachConnMeta(items []store.Item, procs []Proc, meta map[string]playbook.Meta) {
-	byName := map[string]Proc{}
+// attachConnMeta gives each connection item the path, command and parent
+// chain of the process that owns the socket, matched by PID.
+func attachConnMeta(items []store.Item, pids map[string]int, procs []Proc, meta map[string]playbook.Meta) {
+	byPID := map[int]Proc{}
 	for _, p := range procs {
-		byName[p.Name] = p
+		byPID[p.PID] = p
 	}
 	for _, it := range items {
-		if p, ok := byName[it.Name]; ok {
-			if m, ok := meta[p.Item.ID]; ok {
-				meta[it.ID] = m
-			}
+		p, ok := byPID[pids[it.ID]]
+		if !ok {
+			continue
+		}
+		if m, ok := meta[p.Item.ID]; ok {
+			meta[it.ID] = m
 		}
 	}
 }

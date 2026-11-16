@@ -1,6 +1,7 @@
 package playbook
 
 import (
+	"fmt"
 	"net"
 	"path/filepath"
 	"strings"
@@ -51,6 +52,42 @@ type Result struct {
 	States   map[string]store.FindingState
 }
 
+// Trust facts the collector writes on a UDP socket with no peer
+// (internal/collect/trust.go).
+const (
+	FactBound        = "Bound to"
+	BoundGone        = "An address this Mac no longer has"
+	FactPortRange    = "Port range"
+	PortTemporary    = "Temporary"
+	FactSignedBy     = "Signed by"
+	SignerUnverified = "Not verified"
+	FactExecutable   = "Executable"
+)
+
+type udpGroup struct {
+	key    string
+	item   store.Item
+	signer string
+	meta   Meta
+	addrs  []string
+}
+
+// groupedUDP is true for a UDP socket with no peer, on a temporary port,
+// whose running process passed a signature check, and whose executable is not
+// in a hidden folder. Anything else, including a missing fact, is raised on
+// its own.
+func groupedUDP(c store.Item) bool {
+	if fact(c, "Protocol") != "UDP" || fact(c, FactPortRange) != PortTemporary {
+		return false
+	}
+	signer := fact(c, FactSignedBy)
+	if signer == "" || signer == SignerUnverified {
+		return false
+	}
+	exe := fact(c, FactExecutable)
+	return exe != "" && !hasHiddenSegment(exe)
+}
+
 func DismissalKey(f store.Finding) string {
 	return strings.TrimPrefix(f.ID, f.Category+"-")
 }
@@ -65,6 +102,8 @@ func Evaluate(in Input) Result {
 		procsByName[p.Name] = p
 	}
 	var findings []store.Finding
+	groups := map[string]*udpGroup{}
+	var groupOrder []string
 
 	for _, c := range in.Connections {
 		dir := fact(c, "Direction")
@@ -75,7 +114,13 @@ func Evaluate(in Input) Result {
 		if addr == "" {
 			addr = c.Detail
 		}
+		// The collector links a connection to its process by PID and stores
+		// that under the item's ID. The name lookup is only a fallback,
+		// because a program chooses its own name.
 		proc, ok := procsByName[c.Name]
+		if m, has := in.Meta[c.ID]; has && m.Path != "" {
+			proc, ok = store.Item{}, false
+		}
 		path, user := pathUser(proc, in.Meta)
 		if !ok {
 			if m, ok := in.Meta[c.ID]; ok {
@@ -95,10 +140,25 @@ func Evaluate(in Input) Result {
 		meta := metaFor(c, proc, in.Meta)
 
 		if strings.EqualFold(dir, "Listening") && port != "" && port != "*" && isExposedHost(host) && port != "5353" {
-			findings = append(findings, finding("exposed", "connections", c, key, c.Name, c.Name+" on port "+port, meta, []string{
-				uptimeFact(c, proc),
-				addr,
-			}))
+			switch {
+			case fact(c, FactBound) == BoundGone:
+				// Nothing can reach an address this Mac no longer has.
+			case groupedUDP(c):
+				signer := fact(c, FactSignedBy)
+				gk := "udp|" + c.Name + "|" + signer + "|" + user
+				g, seen := groups[gk]
+				if !seen {
+					g = &udpGroup{key: gk, item: c, signer: signer, meta: meta}
+					groups[gk] = g
+					groupOrder = append(groupOrder, gk)
+				}
+				g.addrs = append(g.addrs, addr)
+			default:
+				findings = append(findings, finding("exposed", "connections", c, key, c.Name, c.Name+" on port "+port, meta, []string{
+					uptimeFact(c, proc),
+					addr,
+				}))
+			}
 		}
 		if strings.EqualFold(dir, "Outbound") && isUnknownAddress(host, port) {
 			remote := host + ":" + port
@@ -107,6 +167,24 @@ func Evaluate(in Input) Result {
 				remote,
 			}))
 		}
+	}
+
+	for _, gk := range groupOrder {
+		g := groups[gk]
+		n := len(g.addrs)
+		noun := "sockets"
+		if n == 1 {
+			noun = "socket"
+		}
+		shown := g.addrs
+		if len(shown) > 3 {
+			shown = append(shown[:3:3], fmt.Sprintf("and %d more", n-3))
+		}
+		findings = append(findings, finding("exposed", "connections", g.item, g.key, g.item.Name,
+			fmt.Sprintf("%s has %d UDP %s on temporary ports", g.item.Name, n, noun), g.meta, []string{
+				"Signed by " + g.signer + ", verified for the running process",
+				strings.Join(shown, ", "),
+			}))
 	}
 
 	for _, p := range in.Processes {

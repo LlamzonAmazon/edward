@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/LlamzonAmazon/edward/internal/redact"
 )
@@ -70,11 +71,17 @@ func TestParseProcesses(t *testing.T) {
 }
 
 func TestParseLsofConnections(t *testing.T) {
+	stubTrust(t)
 	recs := parseLsof(fixture(t, "lsof.txt"))
-	if len(recs) != 7 {
-		t.Fatalf("want 7 sockets, got %d", len(recs))
+	if len(recs) != 14 {
+		t.Fatalf("want 14 sockets, got %d", len(recs))
 	}
-	items := connectionItems(recs, "alice", "501", map[int]string{610: "1 h"})
+	for _, r := range recs {
+		if r.proto != "TCP" && r.proto != "UDP" {
+			t.Fatalf("socket %s has protocol %q", r.name, r.proto)
+		}
+	}
+	items, pids := connectionItems(recs, "alice", "501", map[int]Proc{610: {PID: 610, EtimePretty: "1 h"}}, time.Now())
 	got := map[string]string{}
 	for _, it := range items {
 		got[it.Name+" "+it.Detail] = it.Meta
@@ -84,7 +91,14 @@ func TestParseLsofConnections(t *testing.T) {
 		"Slack 34.120.0.1:443": "Outbound",
 		"mDNSResponder *:5353": "Listening",
 		// Two connections accepted on node's port 3000 from one peer are one item.
-		"node 10.0.0.9 → :3000": "Inbound",
+		"node 10.0.0.9 → :3000":                  "Inbound",
+		"Google Chrome Helper *:64330":           "Listening",
+		"Google Chrome Helper 10.0.0.33:52743":   "Listening",
+		"Google Chrome Helper 172.20.10.5:59379": "Listening",
+		"Google Chrome Helper [fe80:4::1]:61000": "Listening",
+		"Google Chrome Helper 142.250.72.14:443": "Outbound",
+		"Google Chrome Helper *:64331":           "Listening",
+		"relay *:5514":                           "Listening",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("items = %v", got)
@@ -93,6 +107,9 @@ func TestParseLsofConnections(t *testing.T) {
 		if got[k] != dir {
 			t.Fatalf("%s = %q, want %q (all: %v)", k, got[k], dir, got)
 		}
+	}
+	if pids["c-Google Chrome Helper-*:64331"] != 640 {
+		t.Fatalf("item not linked to its own PID: %v", pids)
 	}
 	if displayAddr("127.0.0.1:8080->127.0.0.1:5000", "Listening") != "127.0.0.1:8080" {
 		t.Fatal("listening address kept the peer")
