@@ -1,7 +1,7 @@
 import { ReactNode, TransitionEvent, isValidElement, useCallback, useEffect, useRef, useState } from "react";
 import type { IconName } from "./data";
 
-function useReducedMotion() {
+export function useReducedMotion() {
   const [reduce, setReduce] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -351,11 +351,96 @@ export function Chevron({ open }: { open: boolean }) {
   );
 }
 
-export function Reveal({ open, children }: { open: boolean; children: ReactNode }) {
+/**
+ * Opens and closes its content by sliding its height (grid rows 0fr to 1fr).
+ * With appear, content that mounts open starts closed and slides open, after
+ * delay ms, so a row that arrives with new data never appears in one frame.
+ */
+export function Reveal({ open, children, appear, delay = 0 }: { open: boolean; children: ReactNode; appear?: boolean; delay?: number }) {
+  const [arrived, setArrived] = useState(!appear);
+  const [waiting, setWaiting] = useState(!!appear);
+  useEffect(() => {
+    if (arrived) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setArrived(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [arrived]);
+  useEffect(() => {
+    if (!arrived || !waiting) return;
+    const id = window.setTimeout(() => setWaiting(false), delay + token("--dur-base"));
+    return () => window.clearTimeout(id);
+  }, [arrived, waiting, delay]);
   return (
-    <div className="reveal" data-open={open}>
+    <div className="reveal" data-open={open && arrived} style={waiting && delay ? { transitionDelay: `${delay}ms` } : undefined}>
       <div className="reveal__inner">{children}</div>
     </div>
+  );
+}
+
+/**
+ * An easing token as a function of time, so script motion uses the same
+ * curve as CSS. Reads cubic-bezier(x1, y1, x2, y2) from the custom property.
+ */
+export function easing(name: string): (t: number) => number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+  const m = raw.match(/cubic-bezier\(([^)]+)\)/);
+  const [x1, y1, x2, y2] = m ? m[1].split(",").map(Number) : [0, 0, 1, 1];
+  const at = (a: number, b: number, t: number) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+  return (x: number) => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (at(x1, x2, mid) < x) lo = mid;
+      else hi = mid;
+    }
+    return at(y1, y2, (lo + hi) / 2);
+  };
+}
+
+/**
+ * A number that counts from its last value to its new one over --dur-reveal,
+ * starting after delay ms, so a count never jumps. It shows its first value
+ * at once. Screen readers get the final value only.
+ */
+export function Count({ value, delay = 0, className = "num" }: { value: number; delay?: number; className?: string }) {
+  const reduce = useReducedMotion();
+  const [shown, setShown] = useState(value);
+  const shownRef = useRef(value);
+  useEffect(() => {
+    const from = shownRef.current;
+    if (from === value) return;
+    if (reduce) {
+      shownRef.current = value;
+      setShown(value);
+      return;
+    }
+    const dur = token("--dur-reveal");
+    const ease = easing("--ease-out");
+    const start = performance.now() + delay;
+    let raf = 0;
+    const step = (now: number) => {
+      const t = Math.min(Math.max((now - start) / dur, 0), 1);
+      const n = Math.round(from + (value - from) * ease(t));
+      shownRef.current = n;
+      setShown(n);
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value, delay, reduce]);
+  return (
+    <span className={className}>
+      <span aria-hidden>{shown}</span>
+      <span className="sr-only">{value}</span>
+    </span>
   );
 }
 

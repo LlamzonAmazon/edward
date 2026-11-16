@@ -15,7 +15,7 @@ import {
   type Status,
   type Store,
 } from "./api";
-import { agentNames, agents, filesPrompt, Finding, Source } from "./data";
+import { agentNames, filesPrompt, Finding, Source } from "./data";
 import { makeSurface, SurfaceContext } from "./surface";
 import { Scrim, Toast, token, useEscape, useLatched } from "./ui";
 import { Graph } from "./Graph";
@@ -37,17 +37,26 @@ const logFallback = () => {
   console.info("EDwaRd: store API unavailable, using fixture data");
 };
 
-const foundIds = (s: Store) => s.agents.filter((a) => a.found).map((a) => a.id);
-
 export default function App() {
   const [store, setStore] = useState(fixtureStore);
-  const [firstRunOpen, setFirstRunOpen] = useState(true);
+  // Nothing renders until the first store read finishes, so a real install never
+  // shows the fixture graph for a frame. The mock falls back to fixtures when no
+  // API answers.
+  const [booted, setBooted] = useState(false);
+  const [entering, setEntering] = useState(false);
+  const [firstRunOpen, setFirstRunOpen] = useState(false);
+  // During first run the map and sidebar show an empty Mac. Closing first run
+  // (Done, Skip or close) reveals the data: dots leave their sources, counts
+  // count up, and the sidebar fills (cascade).
+  const [revealed, setRevealed] = useState(false);
+  const [cascade, setCascade] = useState(false);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [rowId, setRowId] = useState<string | null>(null);
   const [findingId, setFindingId] = useState<string | null>(null);
   const [allOpen, setAllOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [agentIds, setAgentIds] = useState(() => agents.filter((a) => a.found).map((a) => a.id));
+  // First run starts with no agent picked. Each row still says where it was found.
+  const [agentIds, setAgentIds] = useState<string[]>([]);
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
   const [age, setAge] = useState(2);
 
@@ -75,6 +84,17 @@ export default function App() {
     [applyStore],
   );
 
+  // The page's one entrance: the graph builds outward across --dur-stagger
+  // (components.css, "First load"), and first run opens once it has finished.
+  const boot = useCallback((firstRun: boolean) => {
+    setBooted(true);
+    setRevealed(!firstRun);
+    setEntering(true);
+    const built = token("--dur-stagger");
+    window.setTimeout(() => setEntering(false), built + token("--dur-slow"));
+    if (firstRun) window.setTimeout(() => setFirstRunOpen(true), built);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     getStore()
@@ -82,11 +102,13 @@ export default function App() {
         if (cancelled) return;
         live.current = true;
         applyStore(s, { tick: true });
-        if (s.firstRunDone) setFirstRunOpen(false);
-        else setAgentIds(s.hookedAgents.length ? s.hookedAgents : foundIds(s));
+        if (!s.firstRunDone) setAgentIds(s.hookedAgents);
+        boot(!s.firstRunDone);
       })
       .catch(() => {
-        if (!cancelled) logFallback();
+        if (cancelled) return;
+        logFallback();
+        boot(true);
       });
     return () => {
       cancelled = true;
@@ -137,7 +159,10 @@ export default function App() {
     [applyStore],
   );
 
-  const surface = useMemo(() => makeSurface(store, setFilesOn), [store, setFilesOn]);
+  const surface = useMemo(
+    () => makeSurface(revealed ? store : { ...store, sources: store.sources.map((s) => ({ ...s, items: [] })) }, setFilesOn),
+    [store, setFilesOn, revealed],
+  );
   const { sources, findings } = surface;
   const state = useMemo(() => {
     const next: Record<string, FindingState> = { ...store.states };
@@ -157,6 +182,8 @@ export default function App() {
   const source = useLatched(sources.find((s) => s.id === sourceId) ?? null);
   const finding = useLatched(findings.find((f) => f.id === findingId) ?? null);
 
+  const revealedRef = useRef(false);
+  revealedRef.current = revealedRef.current || revealed;
   const closeFinding = useCallback(() => setFindingId(null), []);
   const closeSource = useCallback(() => setSourceId(null), []);
   const closeFirstRun = useCallback(() => {
@@ -164,7 +191,42 @@ export default function App() {
       write(() => postFirstRun(true), (s) => ({ ...s, firstRunDone: true }));
     }
     setFirstRunOpen(false);
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    // Start once the dialog has finished closing, and keep the cascade timing
+    // until the last source and the sidebar have arrived.
+    window.setTimeout(() => {
+      setRevealed(true);
+      setCascade(true);
+      window.setTimeout(() => setCascade(false), token("--dur-stagger") * 2 + token("--dur-reveal"));
+    }, token("--dur-slow"));
   }, [write]);
+  // Turn off and Delete stop the program that serves this page. It replies,
+  // quits about 500 ms later, and its LaunchAgent is removed about a second
+  // after that (launchd may start it once more in between). So success means
+  // the API has stopped answering, checked until a deadline. A reply with an
+  // HTTP error means EDwaRd refused, and is reported at once.
+  const stopEdward = useCallback(async (post: () => Promise<unknown>): Promise<"ok" | "fail"> => {
+    if (!live.current) return "fail";
+    try {
+      await post();
+    } catch (e) {
+      if (!(e instanceof TypeError)) return "fail";
+    }
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const deadline = performance.now() + 8000;
+    await wait(1500);
+    while (performance.now() < deadline) {
+      try {
+        await getStore();
+      } catch {
+        live.current = false;
+        return "ok";
+      }
+      await wait(300);
+    }
+    return "fail";
+  }, []);
   const closeAll = useCallback(() => setAllOpen(false), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   const top = findingId ? closeFinding : settingsOpen ? closeSettings : allOpen ? closeAll : sourceId ? closeSource : closeFirstRun;
@@ -214,6 +276,8 @@ export default function App() {
   const readAgo = store.paused ? "Paused" : age === 0 ? "Just now" : `${age} s ago`;
   const dialogOpen = !!findingId || allOpen || settingsOpen || firstRunOpen;
 
+  if (!booted) return null;
+
   return (
     <SurfaceContext.Provider value={surface}>
       <div className="app">
@@ -233,9 +297,10 @@ export default function App() {
           onAll={() => setAllOpen(true)}
           onSettings={() => setSettingsOpen(true)}
           settingsOpen={settingsOpen}
+          cascade={cascade}
         />
         <main className="main">
-          <Graph state={state} onSource={(s) => openSource(s)} onFinding={(f) => setFindingId(f.id)} onItem={(s, id) => openSource(s, id)} />
+          <Graph entering={entering} cascade={cascade} state={state} onSource={(s) => openSource(s)} onFinding={(f) => setFindingId(f.id)} onItem={(s, id) => openSource(s, id)} />
         </main>
       </div>
 
@@ -271,38 +336,8 @@ export default function App() {
             const paused = !storeRef.current.paused;
             write(() => postPause(paused), (s) => ({ ...s, paused }));
           }}
-          onDeactivate={async () => {
-            if (!live.current) return "fail";
-            try {
-              await postDeactivate();
-            } catch {
-              /* process may exit before the response arrives */
-            }
-            await new Promise((r) => setTimeout(r, 400));
-            try {
-              await getStore();
-              return "fail";
-            } catch {
-              live.current = false;
-              return "ok";
-            }
-          }}
-          onUninstall={async () => {
-            if (!live.current) return "fail";
-            try {
-              await postUninstall();
-            } catch {
-              /* process may exit before the response arrives */
-            }
-            await new Promise((r) => setTimeout(r, 400));
-            try {
-              await getStore();
-              return "fail";
-            } catch {
-              live.current = false;
-              return "ok";
-            }
-          }}
+          onDeactivate={() => stopEdward(postDeactivate)}
+          onUninstall={() => stopEdward(postUninstall)}
           onClose={closeSettings}
         />
       </div>

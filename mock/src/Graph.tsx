@@ -1,7 +1,7 @@
 import { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { categories, raisedShown, Finding, Item, Source } from "./data";
 import { useSurface } from "./surface";
-import { Icon, token, Wipe } from "./ui";
+import { Count, easing, Icon, token, useReducedMotion, Wipe } from "./ui";
 import type { FindingState } from "./App";
 
 type P = { x: number; y: number };
@@ -40,6 +40,73 @@ function onGraph(item: Item, state: Record<string, FindingState>) {
   return st === "raised" || st === "asked";
 }
 
+type Drawn = P & { o: number };
+
+/**
+ * Where each dot is drawn. Targets come from the layout. When a target
+ * changes, the dot travels there over --dur-reveal (motion principle 5): a new
+ * dot leaves its source node, a dot that is no longer raised returns to it and
+ * fades, and a dot already moving starts from where it is (principle 6). A
+ * resize or reduced motion places dots at once.
+ */
+function useDots(targets: Record<string, P>, homes: Record<string, P>, sizeKey: string, delayOf: (id: string) => number): Record<string, Drawn> {
+  const reduce = useReducedMotion();
+  const [drawn, setDrawn] = useState<Record<string, Drawn>>({});
+  const cur = useRef<Record<string, Drawn>>({});
+  const home = useRef<Record<string, P>>({});
+  const lastSize = useRef(sizeKey);
+  const key = Object.keys(targets)
+    .sort()
+    .map((id) => `${id}:${Math.round(targets[id].x)},${Math.round(targets[id].y)}`)
+    .join("|");
+
+  useEffect(() => {
+    Object.assign(home.current, homes);
+    const to: Record<string, Drawn> = {};
+    for (const id in targets) to[id] = { ...targets[id], o: 1 };
+    for (const id in cur.current) if (!targets[id] && home.current[id]) to[id] = { ...home.current[id], o: 0 };
+    const snap = reduce || lastSize.current !== sizeKey;
+    lastSize.current = sizeKey;
+    if (snap) {
+      const next: Record<string, Drawn> = {};
+      for (const id in to) if (to[id].o > 0) next[id] = to[id];
+      cur.current = next;
+      setDrawn(next);
+      return;
+    }
+    const from: Record<string, Drawn> = {};
+    const wait: Record<string, number> = {};
+    for (const id in to) {
+      from[id] = cur.current[id] ?? { ...(home.current[id] ?? to[id]), o: 0 };
+      wait[id] = cur.current[id] ? 0 : delayOf(id);
+    }
+    const dur = token("--dur-reveal");
+    const ease = easing("--ease-out");
+    const start = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const next: Record<string, Drawn> = {};
+      let moving = false;
+      for (const id in to) {
+        const t = clamp((now - start - wait[id]) / dur, 0, 1);
+        if (t < 1) moving = true;
+        else if (to[id].o === 0) continue;
+        const e = ease(t);
+        const a = from[id];
+        const b = to[id];
+        next[id] = { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e, o: a.o + (b.o - a.o) * e };
+      }
+      cur.current = next;
+      setDrawn(next);
+      if (moving) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [key, sizeKey, reduce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return drawn;
+}
+
 function anchor(dir: P, gap: number): CSSProperties {
   if (Math.abs(dir.x) >= 0.45) return { transform: `translate(${dir.x < 0 ? `calc(-100% - ${gap}px)` : `${gap}px`}, -50%)` };
   return { transform: `translate(-50%, ${dir.y < 0 ? `calc(-100% - ${gap}px)` : `${gap}px`})` };
@@ -53,11 +120,17 @@ function labelStyle(l: { side: string; q: P; cx: number; y: number }): CSSProper
 }
 
 export function Graph({
+  entering,
+  cascade,
   state,
   onSource,
   onFinding,
   onItem,
 }: {
+  /** True during the first-load entrance only; see "First load" in components.css. */
+  entering: boolean;
+  /** True during the reveal after first run: dots and counts arrive source by source. */
+  cascade: boolean;
   state: Record<string, FindingState>;
   onSource: (s: Source) => void;
   onFinding: (f: Finding) => void;
@@ -126,6 +199,8 @@ export function Graph({
     const r0 = hubR + 28;
     const pos: Record<string, P> = {};
     const hubOf: Record<string, string> = {};
+    const home: Record<string, P> = {};
+    const order: Record<string, { hub: number; k: number }> = {};
     const hubs = sources.map((s, i) => {
       const a = HUB_ANGLES[i] * RAD;
       const dir = { x: Math.cos(a), y: Math.sin(a) };
@@ -137,10 +212,12 @@ export function Graph({
         const r = r0 + Math.floor(k / 8) * 28 + (flagged.length > 4 && k % 2 ? token("--space-5") : 0);
         pos[it.id] = { x: p.x + r * Math.cos(t), y: p.y + r * Math.sin(t) };
         hubOf[it.id] = s.id;
+        home[it.id] = p;
+        order[it.id] = { hub: i, k };
       });
       return { s, p, dir };
     });
-    return { center, hubs, pos, hubOf, hubR, ring: r0 };
+    return { center, hubs, pos, hubOf, home, order, hubR, ring: r0 };
   }, [size, sources, state]);
 
   const toneOfItem = (it: Item) => {
@@ -269,8 +346,32 @@ export function Graph({
     applyView(IDENTITY);
   };
 
+  // Arrival order for the build on load and the reveal after first run: one
+  // source after another, then each source's dots in turn.
+  const hubDelay = (i: number) => {
+    if (!entering && !cascade) return 0;
+    const stagger = token("--dur-stagger");
+    return (entering ? (stagger * 2) / 3 : 0) + (i * stagger) / 5;
+  };
+  const delayOf = (id: string) => {
+    const o = layout.order[id];
+    return o ? hubDelay(o.hub) + (o.k * token("--dur-fast")) / 3 : 0;
+  };
+  const drawn = useDots(layout.pos, layout.home, `${size.w}x${size.h}`, delayOf);
+  const at = (id: string) => drawn[id];
+  // A label whose dot is leaving stays on it until the dot is gone.
+  const lastLabels = useRef(new Map<string, (typeof labels)[number]>());
+  for (const l of labels) lastLabels.current.set(l.it.id, l);
+  const current = new Set(labels.map((l) => l.it.id));
+  const shownLabels = [...labels, ...Object.keys(drawn).filter((id) => !current.has(id) && !layout.pos[id] && lastLabels.current.has(id)).map((id) => lastLabels.current.get(id)!)];
+
   const ready = size.w > 0;
-  const { center, hubs, pos, hubR } = layout;
+  const { center, hubs, hubR } = layout;
+  // A dot that is leaving may belong to an item the latest store no longer has,
+  // so the last item seen for each id is kept for its exit.
+  const seenItems = useRef(new Map<string, { it: Item; s: Source }>());
+  for (const s of sources) for (const it of s.items) seenItems.current.set(it.id, { it, s });
+  const itemsById = seenItems.current;
   const shownTip = tip ?? lastTip;
 
   return (
@@ -278,6 +379,7 @@ export function Graph({
       className="graph"
       ref={ref}
       data-drag={dragging}
+      data-entering={entering}
       style={{
         backgroundSize: `${GRID * view.k}px ${GRID * view.k}px`,
         backgroundPosition: `${view.x}px ${view.y}px`,
@@ -294,14 +396,19 @@ export function Graph({
             {hubs.map(({ s, p }) => (
               <line key={`spine-${s.id}`} className="edge edge--spine" x1={center.x} y1={center.y} x2={p.x} y2={p.y} data-tone={s.collected ? undefined : "empty"} data-hot={hot?.kind === "hub" && hot.id === s.id} data-dim={dim(hubKey(s.id))} />
             ))}
-            {hubs.map(({ s, p }) =>
-              s.items.filter((it) => pos[it.id]).map((it) => (
-                <line key={`e-${it.id}`} className="edge" x1={p.x} y1={p.y} x2={pos[it.id].x} y2={pos[it.id].y} data-tone={toneOfItem(it)} data-dim={edgeDim(hubKey(s.id), it.id)} />
-              )),
-            )}
+            {Object.entries(drawn).map(([id, d]) => {
+              const hit = itemsById.get(id);
+              const h = layout.home[id];
+              if (!h) return null;
+              return (
+                <g key={`e-${id}`} opacity={d.o}>
+                  <line className="edge" x1={h.x} y1={h.y} x2={d.x} y2={d.y} data-tone={hit ? toneOfItem(hit.it) : undefined} data-dim={hit ? edgeDim(hubKey(hit.s.id), id) : false} />
+                </g>
+              );
+            })}
             {links.map((l) => {
-              const a = pos[l.a];
-              const b = pos[l.b];
+              const a = at(l.a);
+              const b = at(l.b);
               if (!a || !b) return null;
               const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
               const c = { x: mid.x + (center.x - mid.x) * 0.45, y: mid.y + (center.y - mid.y) * 0.45 };
@@ -309,21 +416,23 @@ export function Graph({
                 const it = sources.flatMap((s) => s.items).find((x) => x.id === id);
                 return it ? toneOfItem(it) === "flag" : false;
               });
-              return <path key={`${l.a}-${l.b}`} className="edge edge--link" d={`M${a.x} ${a.y} Q${c.x} ${c.y} ${b.x} ${b.y}`} data-tone={l.story && raised ? "flag" : undefined} data-dim={edgeDim(l.a, l.b)} />;
+              return <path key={`${l.a}-${l.b}`} opacity={Math.min(a.o, b.o)} className="edge edge--link" d={`M${a.x} ${a.y} Q${c.x} ${c.y} ${b.x} ${b.y}`} data-tone={l.story && raised ? "flag" : undefined} data-dim={edgeDim(l.a, l.b)} />;
             })}
             {hubs.filter(({ s }) => !s.collected).map(({ s, p }) => (
               <circle key={`ring-${s.id}`} className="ring" cx={p.x} cy={p.y} r={layout.ring} data-dim={dim(hubKey(s.id))} />
             ))}
-            {hubs.map(({ s }) =>
-              s.items.filter((it) => pos[it.id]).map((it) => {
-                const tone = toneOfItem(it);
-                const r = tone ? token("--node-flag") : token("--node-item");
-                return (
+            {Object.entries(drawn).map(([id, d]) => {
+              const hit = itemsById.get(id);
+              if (!hit) return null;
+              const { it, s } = hit;
+              const tone = toneOfItem(it);
+              const r = tone ? token("--node-flag") : token("--node-item");
+              return (
+                <g key={`n-${it.id}`} opacity={d.o}>
                   <circle
-                    key={`n-${it.id}`}
                     className="item"
-                    cx={pos[it.id].x}
-                    cy={pos[it.id].y}
+                    cx={d.x}
+                    cy={d.y}
                     r={r}
                     data-tone={tone}
                     data-hot={hot?.id === it.id}
@@ -332,9 +441,9 @@ export function Graph({
                     onMouseLeave={leave}
                     onClick={() => clickItem(s, it)}
                   />
-                );
-              }),
-            )}
+                </g>
+              );
+            })}
           </svg>
 
           <div className="node node--root" style={{ left: center.x, top: center.y }}>
@@ -347,7 +456,7 @@ export function Graph({
             </span>
           </div>
 
-          {hubs.map(({ s, p, dir }) => {
+          {hubs.map(({ s, p, dir }, i) => {
             const inward = { x: -dir.x, y: -dir.y };
             const at = { left: p.x + inward.x * (hubR + 2), top: p.y + inward.y * (hubR + 2) };
             return (
@@ -370,11 +479,15 @@ export function Graph({
                   }}
                 >
                   <Icon name={s.icon} />
-                  {raisedIn(s) > 0 && <span className="hub-badge num">{raisedIn(s)}</span>}
+                  {raisedIn(s) > 0 && (
+                    <span className="hub-badge" style={{ animationDelay: `${hubDelay(i)}ms` }}>
+                      <Count value={raisedIn(s)} delay={hubDelay(i)} />
+                    </span>
+                  )}
                 </button>
                 <div className="label" style={{ ...at, ...anchor(inward, 8) }} data-dim={dim(hubKey(s.id))}>
                   <span className="label__name">
-                    {s.name} {s.collected && <span className="muted num">{s.items.length}</span>}
+                    {s.name} {s.collected && <Count className="muted num" value={s.items.length} delay={hubDelay(i)} />}
                   </span>
                   <span className="label__sub">{s.collected ? s.tileFeed : shortWhy[s.id]}</span>
                 </div>
@@ -383,12 +496,25 @@ export function Graph({
           })}
 
           <svg className="graph__svg graph__svg--over" width={size.w} height={size.h} aria-hidden>
-            {labels.map((l) => (
-              <line key={`ld-${l.it.id}`} className="leader" data-tone={toneOfItem(l.it)} data-dim={dim(l.it.id)} x1={l.q.x} y1={l.q.y} x2={l.side === "right" ? l.q.x + token("--label-gap") : l.side === "left" ? l.q.x - token("--label-gap") : l.q.x} y2={l.y} />
-            ))}
+            {shownLabels.map((l) => {
+              const d = at(l.it.id);
+              if (!d) return null;
+              const x2 = l.side === "right" ? l.q.x + token("--label-gap") : l.side === "left" ? l.q.x - token("--label-gap") : l.q.x;
+              return (
+                <g key={`ld-${l.it.id}`} opacity={d.o}>
+                  <line className="leader" data-tone={toneOfItem(l.it)} data-dim={dim(l.it.id)} x1={d.x} y1={d.y} x2={d.x + x2 - l.q.x} y2={d.y + l.y - l.q.y} />
+                </g>
+              );
+            })}
           </svg>
-          {labels.map((l) => (
-            <div key={`fl-${l.it.id}`} className="flag-label" data-tone={toneOfItem(l.it)} data-dim={dim(l.it.id)} style={labelStyle(l)}>
+          {shownLabels.map((l) => {
+            const d = at(l.it.id);
+            if (!d) return null;
+            // A label rides with its dot: same offset from the dot, same opacity.
+            const moved = { ...l, q: { x: d.x, y: d.y }, cx: l.cx + d.x - l.q.x, y: l.y + d.y - l.q.y };
+            return (
+            <div key={`fl-${l.it.id}`} style={{ opacity: d.o }}>
+            <div className="flag-label" data-tone={toneOfItem(l.it)} data-dim={dim(l.it.id)} style={labelStyle(moved)}>
               <Wipe tone="flag" size="s" onClick={() => onFinding(l.f)} onMouseEnter={() => setHot({ kind: "item", id: l.it.id })} onMouseLeave={leave}>
                 <span className="cat-tile cat-tile--s" data-cat={categories[l.f.category].color}>
                   <Icon name={toneOfItem(l.it) === "accent" ? "agent" : categories[l.f.category].icon} />
@@ -397,7 +523,9 @@ export function Graph({
                 <span className="flag-label__rest">{l.f.value}</span>
               </Wipe>
             </div>
-          ))}
+            </div>
+            );
+          })}
 
           <div className="tip" data-open={!!tip} style={{ left: shownTip?.x, top: shownTip?.y }}>
             <span className="t-strong">{shownTip?.title}</span>

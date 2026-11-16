@@ -564,6 +564,41 @@ button.nav__heading:hover {
   background-image: radial-gradient(var(--hairline) 1px, transparent 1px);
   background-size: var(--graph-grid) var(--graph-grid);
 }
+/* ---------- First load ----------
+   The page's one entrance (motion principle 2, tempo contrast): the shell fades
+   in, then the graph builds outward across --dur-stagger. The Mac first, then
+   its sources, then what each source found. Hubs settle from 0.9 scale
+   (principle 4). Dots and their lines are moved by script (useDots in
+   Graph.tsx), because SVG line ends cannot be transitioned in CSS: each dot
+   leaves its source node. It runs once: .graph carries data-entering only
+   until the build ends. Reduced motion sets every duration here to 1ms. */
+.app {
+  animation: fade-in var(--dur-slow) var(--ease-out) both;
+}
+.graph[data-entering="true"] :is(.node--root + .label) {
+  animation: fade-in var(--dur-slow) var(--ease-out) both;
+}
+.graph[data-entering="true"] .node--root {
+  animation: settle-in var(--dur-slow) var(--ease-out) both;
+}
+.graph[data-entering="true"] :is(.edge--spine, .ring, .node--hub + .label) {
+  animation: fade-in var(--dur-slow) var(--ease-out) calc(var(--dur-stagger) / 3) both;
+}
+.graph[data-entering="true"] .node--hub {
+  animation: settle-in var(--dur-slow) var(--ease-out) calc(var(--dur-stagger) / 3) both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    scale: 0.9;
+  }
+}
+
 .graph[data-drag="true"] {
   cursor: grabbing;
 }
@@ -683,6 +718,7 @@ button.nav__heading:hover {
   background: var(--accent);
 }
 .hub-badge {
+  animation: settle-in var(--dur-slow) var(--ease-out) both;
   position: absolute;
   top: -2px;
   right: -2px;

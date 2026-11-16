@@ -126,7 +126,11 @@
   --dur-fast: 140ms;
   --dur-base: 240ms;
   --dur-slow: 380ms;
+  /* The first-load build of the graph, from the Mac to what each source found. */
   --dur-stagger: 900ms;
+  /* Showcase travel, used once per load: dots leaving their source and counts
+     counting up. Longer than the response durations on purpose (principle 2). */
+  --dur-reveal: 700ms;
   /* How long a confirmation stays fully shown before it rolls back. */
   --dur-hold: 500ms;
   --dur-toast: 4200ms;
@@ -146,5 +150,7 @@
     --dur-fast: 1ms;
     --dur-base: 1ms;
     --dur-slow: 1ms;
+    --dur-stagger: 1ms;
+    --dur-reveal: 1ms;
   }
 }

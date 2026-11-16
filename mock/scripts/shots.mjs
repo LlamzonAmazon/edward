@@ -16,6 +16,9 @@ await page.goto("http://127.0.0.1:5173/");
 await page.waitForTimeout(900);
 await shot("01-first-run");
 
+// First run starts with no agent picked.
+await page.locator(`${open} .toggle[aria-label='Claude Code']`).click();
+await page.locator(`${open} .toggle[aria-label='Codex']`).click();
 await page.locator(`${open} .wipe`, { hasText: "Next" }).click();
 await page.locator(`${open} .wipe`, { hasText: "Open System Settings" }).click();
 await page.locator(`${open} .toggle[aria-label='New files']`).click();
