@@ -1,0 +1,35 @@
+{
+  "id": "ind-rustbucket-path",
+  "kind": "indicator",
+  "title": "Runs from the same path as RustBucket",
+  "source": "processes",
+  "when": [
+    {
+      "fact": "Path",
+      "is": [
+        "~/Library/Metadata/System Update"
+      ]
+    }
+  ],
+  "technique": "T1036.005",
+  "reports": [
+    {
+      "name": "Elastic Security Labs report on RustBucket",
+      "url": "https://www.elastic.co/security-labs/DPRK-strikes-using-a-new-variant-of-rustbucket"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Path": "~/Library/Metadata/System Update"
+      }
+    ],
+    "noMatch": [
+      {
+        "Path": "/Applications/Example.app/Contents/MacOS/Example"
+      }
+    ]
+  }
+}

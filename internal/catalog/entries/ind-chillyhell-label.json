@@ -1,0 +1,35 @@
+{
+  "id": "ind-chillyhell-label",
+  "kind": "indicator",
+  "title": "Same LaunchAgent label as ChillyHell",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Label",
+      "is": [
+        "com.apple.qtop"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "Objective-See report on ChillyHell",
+      "url": "https://objective-see.org/blog/blog_0x84.html"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Label": "com.apple.qtop"
+      }
+    ],
+    "noMatch": [
+      {
+        "Label": "com.example.agent"
+      }
+    ]
+  }
+}

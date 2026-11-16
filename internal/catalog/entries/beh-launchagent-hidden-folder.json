@@ -1,0 +1,38 @@
+{
+  "id": "beh-launchagent-hidden-folder",
+  "kind": "behavior",
+  "title": "Starts a program from a hidden folder at login",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "contains": [
+        "/."
+      ]
+    }
+  ],
+  "technique": "T1564.001",
+  "reports": [
+    {
+      "name": "MITRE ATT&CK T1564.001 Hidden Files and Directories",
+      "url": "https://attack.mitre.org/techniques/T1564/001/"
+    },
+    {
+      "name": "MITRE ATT&CK T1543.001 Launch Agent",
+      "url": "https://attack.mitre.org/techniques/T1543/001/"
+    }
+  ],
+  "added": "2026-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "~/.config/.sys/helper"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/opt/homebrew/opt/postgresql@18/bin/postgres"
+      }
+    ]
+  }
+}

@@ -21,6 +21,7 @@ EDwaRd's page is http://127.0.0.1:43393. If that page does not answer, EDwaRd is
 2. Answer from findings whose status is `raised`. Cleared findings are not in the answer.
 3. Say: "EDwaRd has this, this, and that."
 4. If the store does not have the answer, say the store does not have that. Do not guess.
+5. A finding in the `known` category matched EDwaRd's built-in catalog. Its `Report` rows are the source links (CISA, NVD, MITRE ATT&CK or a researcher's write-up). Name the CVE or technique and give the link. For an app version, the fix is to update to the `Fixed in` version or later.
 
 Findings in the store already include the playbook callouts. Do not fetch another playbook, and do not paste playbook text into the prompt.
 

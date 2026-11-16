@@ -3,6 +3,7 @@ package collect
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"howett.net/plist"
@@ -61,7 +62,18 @@ func readLaunchAgent(path string) store.Item {
 	if runs == "" {
 		runs = path
 	}
-	return startupItem(name, "LaunchAgent", runs)
+	it := startupItem(name, "LaunchAgent", runs)
+	it.Facts = append(it.Facts, []string{"Label", name})
+	// Variable names only: a value can hold a token.
+	if env, ok := m["EnvironmentVariables"].(map[string]any); ok && len(env) > 0 {
+		names := make([]string, 0, len(env))
+		for k := range env {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		it.Facts = append(it.Facts, []string{"Environment", strings.Join(names, ", ")})
+	}
+	return it
 }
 
 func startupItem(name, kind, runs string) store.Item {

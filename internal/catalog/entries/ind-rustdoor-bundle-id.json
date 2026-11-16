@@ -1,0 +1,35 @@
+{
+  "id": "ind-rustdoor-bundle-id",
+  "kind": "indicator",
+  "title": "Same bundle ID as RustDoor",
+  "source": "apps",
+  "when": [
+    {
+      "fact": "Bundle ID",
+      "is": [
+        "com.id.jobinfo"
+      ]
+    }
+  ],
+  "technique": "T1553.002",
+  "reports": [
+    {
+      "name": "Bitdefender report on RustDoor",
+      "url": "https://www.bitdefender.com/blog/labs/new-macos-backdoor-written-in-rust-shows-possible-link-with-windows-ransomware-group/"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Bundle ID": "com.id.jobinfo"
+      }
+    ],
+    "noMatch": [
+      {
+        "Bundle ID": "com.example.app"
+      }
+    ]
+  }
+}

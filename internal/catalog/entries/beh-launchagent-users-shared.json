@@ -1,0 +1,34 @@
+{
+  "id": "beh-launchagent-users-shared",
+  "kind": "behavior",
+  "title": "Starts a program from the shared Users folder at login",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "prefix": [
+        "/Users/Shared/"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "MITRE ATT&CK T1543.001 Launch Agent",
+      "url": "https://attack.mitre.org/techniques/T1543/001/"
+    }
+  ],
+  "added": "2026-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "/Users/Shared/.agent/update"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/Applications/Tool.app/Contents/MacOS/Tool"
+      }
+    ]
+  }
+}

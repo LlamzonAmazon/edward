@@ -1,0 +1,35 @@
+{
+  "id": "ind-rustbucket-runs",
+  "kind": "indicator",
+  "title": "Starts the same program at login as RustBucket",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "is": [
+        "~/Library/Metadata/System Update"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "Elastic Security Labs report on RustBucket",
+      "url": "https://www.elastic.co/security-labs/DPRK-strikes-using-a-new-variant-of-rustbucket"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "~/Library/Metadata/System Update"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/Applications/Example.app/Contents/MacOS/Example"
+      }
+    ]
+  }
+}

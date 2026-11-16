@@ -1,11 +1,16 @@
 package playbook
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
+	"github.com/LlamzonAmazon/edward/internal/catalog"
 	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
@@ -38,6 +43,10 @@ type Input struct {
 	SkipLogin     bool
 	SkipDisguised bool
 	Meta          map[string]Meta
+	// Home expands "~/" in catalog entries. Now decides which entries have
+	// expired; zero means the current time.
+	Home string
+	Now  time.Time
 }
 
 type Meta struct {
@@ -262,6 +271,8 @@ func Evaluate(in Input) Result {
 			}))
 		}
 	}
+
+	findings = append(findings, knownFindings(in)...)
 
 	kept := make([]store.Finding, 0, len(findings))
 	states := map[string]store.FindingState{}
@@ -501,4 +512,162 @@ func uptimeFact(c, proc store.Item) string {
 		return "Up for " + u
 	}
 	return ""
+}
+
+// knownFindings raises one finding per collected item that matches catalog
+// entries, listing every entry it matched with each entry's source report.
+func knownFindings(in Input) []store.Finding {
+	now := in.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
+	var out []store.Finding
+	for _, src := range []struct {
+		id    string
+		items []store.Item
+	}{
+		{"apps", in.Apps},
+		{"startup", in.Startup},
+		{"processes", in.Processes},
+		{"connections", in.Connections},
+	} {
+		entries := catalog.Active(src.id, now)
+		if len(entries) == 0 {
+			continue
+		}
+		for _, it := range src.items {
+			facts := make(map[string]string, len(it.Facts))
+			for _, f := range it.Facts {
+				if len(f) >= 2 {
+					facts[f[0]] = f[1]
+				}
+			}
+			var matched []catalog.Entry
+			for _, e := range entries {
+				if e.Match(facts, in.Home) {
+					matched = append(matched, e)
+				}
+			}
+			if len(matched) > 0 {
+				out = append(out, knownFinding(src.id, it, facts, matched, in.Meta))
+			}
+		}
+	}
+	return out
+}
+
+var kindOrder = map[string]int{catalog.KindIndicator: 0, catalog.KindBehavior: 1, catalog.KindVersion: 2}
+
+func knownFinding(source string, it store.Item, facts map[string]string, matched []catalog.Entry, metas map[string]Meta) store.Finding {
+	sort.SliceStable(matched, func(i, j int) bool {
+		if kindOrder[matched[i].Kind] != kindOrder[matched[j].Kind] {
+			return kindOrder[matched[i].Kind] < kindOrder[matched[j].Kind]
+		}
+		// Most recently added first within a kind, then by id.
+		if matched[i].Added != matched[j].Added {
+			return matched[i].Added > matched[j].Added
+		}
+		return matched[i].ID < matched[j].ID
+	})
+	ids := make([]string, len(matched))
+	for i, e := range matched {
+		ids[i] = e.ID
+	}
+	sum := sha256.Sum256([]byte(strings.Join(ids, ",")))
+	path, user := pathUser(it, metas)
+	// The key changes when the set of matched entries does, so a finding the
+	// user cleared comes back when a new report matches the same item.
+	key := path + "|" + user + "|" + hex.EncodeToString(sum[:4])
+
+	proc := store.Item{}
+	if source == "processes" {
+		proc = it
+	}
+	meta := metaFor(it, proc, metas)
+
+	allVersions := matched[len(matched)-1].Kind == catalog.KindVersion && matched[0].Kind == catalog.KindVersion
+	value := it.Name
+	var lines []string
+	if allVersions {
+		value = strings.TrimSpace(it.Name + " " + facts["Version"])
+		noun := "bugs"
+		if len(matched) == 1 {
+			noun = "bug"
+		}
+		lines = append(lines, fmt.Sprintf("%d %s attackers are known to use", len(matched), noun))
+		if fix := fixedIn(matched, facts["Version"]); fix != "" {
+			lines = append(lines, "Fixed in "+fix)
+		}
+	}
+	shown := 0
+	for _, e := range matched {
+		if shown == 3 {
+			lines = append(lines, fmt.Sprintf("and %d more", len(matched)-shown))
+			break
+		}
+		line := e.Title
+		if e.CVE != "" {
+			line = e.CVE + ": " + e.Title
+		}
+		lines = append(lines, line)
+		shown++
+	}
+
+	f := finding("known", source, it, key, it.Name, value, meta, lines)
+	seen := map[string]bool{}
+	var techniques []string
+	reports := 0
+	for _, e := range matched {
+		for _, r := range e.Reports {
+			if seen[r.URL] || reports == 6 {
+				continue
+			}
+			seen[r.URL] = true
+			reports++
+			f.Quoted = append(f.Quoted, []string{"Report", r.URL})
+		}
+		if e.Technique != "" && !seen[e.Technique] {
+			seen[e.Technique] = true
+			techniques = append(techniques, e.Technique)
+		}
+	}
+	if len(techniques) > 0 {
+		f.Quoted = append(f.Quoted, []string{"Technique", strings.Join(techniques, ", ")})
+	}
+	return f
+}
+
+// fixedIn is the lowest version past every matched range that contains the
+// installed version: updating to it clears all of them.
+func fixedIn(matched []catalog.Entry, version string) string {
+	got, ok := catalog.ParseVersion(version)
+	if !ok {
+		return ""
+	}
+	var best []int
+	bestText := ""
+	for _, e := range matched {
+		for _, c := range e.When {
+			for _, r := range c.Versions {
+				end := r.Below
+				if end == "" {
+					continue
+				}
+				v, ok := catalog.ParseVersion(end)
+				if !ok || catalog.Compare(got, v) >= 0 {
+					continue
+				}
+				if r.From != "" {
+					from, ok := catalog.ParseVersion(r.From)
+					if !ok || catalog.Compare(got, from) < 0 {
+						continue
+					}
+				}
+				if best == nil || catalog.Compare(v, best) > 0 {
+					best, bestText = v, end
+				}
+			}
+		}
+	}
+	return bestText
 }

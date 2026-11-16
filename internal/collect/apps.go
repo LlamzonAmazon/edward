@@ -50,6 +50,7 @@ func CollectApps(home string) []store.Item {
 		}(i, job)
 	}
 	wg.Wait()
+	items = append(items, osItem(systemVersionPlist))
 	seen := map[string]bool{}
 	out := make([]store.Item, 0, len(items))
 	for _, it := range items {
@@ -78,7 +79,7 @@ func brewPrefix() string {
 
 func inspectApp(job appJob) store.Item {
 	name := strings.TrimSuffix(filepath.Base(job.path), ".app")
-	version := ""
+	version, bundleID := "", ""
 	from := ""
 	if job.brew {
 		from = "Homebrew"
@@ -86,27 +87,28 @@ func inspectApp(job appJob) store.Item {
 			version = filepath.Base(target)
 		}
 	} else {
-		n, v := readAppPlist(job.path)
+		var n string
+		n, version, bundleID = readAppPlist(job.path)
 		if n != "" {
 			name = n
 		}
-		version = v
 	}
-	unsigned, adhoc, authority := false, false, ""
+	var sig signature
 	if strings.HasSuffix(job.path, ".app") {
-		unsigned, adhoc, authority = codesignStatus(job.path)
+		sig = signApp(job.path)
 	}
-	sig := "signed"
+	unsigned, adhoc, authority := sig.unsigned, sig.adhoc, sig.authority
+	status := "signed"
 	switch {
 	case job.brew:
 		from = "Homebrew"
-		sig = "signed"
+		status = "signed"
 	case unsigned:
 		from = "Not signed"
-		sig = "unsigned"
+		status = "unsigned"
 	case adhoc:
 		from = "Ad-hoc signature"
-		sig = "ad-hoc"
+		status = "ad-hoc"
 	case strings.Contains(authority, "Apple Mac OS Application Signing"):
 		from = "App Store"
 	case authority != "":
@@ -114,30 +116,73 @@ func inspectApp(job appJob) store.Item {
 	default:
 		from = "Signed"
 	}
+	facts := [][]string{
+		{"Path", job.path},
+		{"Version", version},
+		{"From", from},
+		{"Signature", status},
+	}
+	// The catalog matches apps by bundle ID and signing team, which a
+	// program cannot pick for itself the way it picks a display name.
+	if bundleID != "" {
+		facts = append(facts, []string{"Bundle ID", bundleID})
+	}
+	if sig.team != "" {
+		facts = append(facts, []string{"Team ID", sig.team})
+	}
 	return store.Item{
 		ID:     "a-" + name,
 		Name:   name,
 		Detail: from,
 		Meta:   version,
-		Facts: [][]string{
-			{"Path", job.path},
-			{"Version", version},
-			{"From", from},
-			{"Signature", sig},
-		},
+		Facts:  facts,
 	}
 }
 
-func readAppPlist(appPath string) (name, version string) {
-	p := filepath.Join(appPath, "Contents", "Info.plist")
-	f, err := os.Open(p)
+const systemVersionPlist = "/System/Library/CoreServices/SystemVersion.plist"
+
+// osItem lists macOS itself with the apps, so the catalog can check its
+// version against known exploited bugs. It reads the version file instead of
+// running sw_vers.
+func osItem(path string) store.Item {
+	f, err := os.Open(path)
 	if err != nil {
-		return "", ""
+		return store.Item{}
 	}
 	defer f.Close()
 	var m map[string]any
 	if err := plist.NewDecoder(f).Decode(&m); err != nil {
-		return "", ""
+		return store.Item{}
+	}
+	version := stringVal(m, "ProductVersion")
+	if version == "" {
+		return store.Item{}
+	}
+	return store.Item{
+		ID:     "a-macOS",
+		Name:   "macOS",
+		Detail: "Apple",
+		Meta:   version,
+		Facts: [][]string{
+			{"Path", path},
+			{"Version", version},
+			{"From", "Apple"},
+			{"Signature", "signed"},
+			{"Kind", "Operating system"},
+		},
+	}
+}
+
+func readAppPlist(appPath string) (name, version, bundleID string) {
+	p := filepath.Join(appPath, "Contents", "Info.plist")
+	f, err := os.Open(p)
+	if err != nil {
+		return "", "", ""
+	}
+	defer f.Close()
+	var m map[string]any
+	if err := plist.NewDecoder(f).Decode(&m); err != nil {
+		return "", "", ""
 	}
 	name = stringVal(m, "CFBundleDisplayName")
 	if name == "" {
@@ -147,7 +192,7 @@ func readAppPlist(appPath string) (name, version string) {
 	if version == "" {
 		version = stringVal(m, "CFBundleVersion")
 	}
-	return name, version
+	return name, version, stringVal(m, "CFBundleIdentifier")
 }
 
 func stringVal(m map[string]any, key string) string {
@@ -159,11 +204,16 @@ func stringVal(m map[string]any, key string) string {
 	return s
 }
 
-type signCacheEntry struct {
-	mtime     time.Time
+type signature struct {
 	unsigned  bool
 	adhoc     bool
 	authority string
+	team      string
+}
+
+type signCacheEntry struct {
+	mtime time.Time
+	sig   signature
 }
 
 var (
@@ -171,7 +221,10 @@ var (
 	signCache = map[string]signCacheEntry{}
 )
 
-func codesignStatus(path string) (unsigned, adhoc bool, authority string) {
+// signApp is codesignStatus; tests replace it.
+var signApp = codesignStatus
+
+func codesignStatus(path string) signature {
 	var mtime time.Time
 	if st, err := os.Stat(path); err == nil {
 		mtime = st.ModTime()
@@ -179,40 +232,44 @@ func codesignStatus(path string) (unsigned, adhoc bool, authority string) {
 	signMu.Lock()
 	if hit, ok := signCache[path]; ok && hit.mtime.Equal(mtime) {
 		signMu.Unlock()
-		return hit.unsigned, hit.adhoc, hit.authority
+		return hit.sig
 	}
 	signMu.Unlock()
 
 	out, err := runCmdCombined(12*time.Second, "/usr/bin/codesign", "-dvv", "--", path)
-	unsigned, adhoc, authority, ok := parseCodesign(string(out), err != nil)
+	sig, ok := parseCodesign(string(out), err != nil)
 	if !ok {
-		return false, false, ""
+		return signature{}
 	}
 	signMu.Lock()
-	signCache[path] = signCacheEntry{mtime: mtime, unsigned: unsigned, adhoc: adhoc, authority: authority}
+	signCache[path] = signCacheEntry{mtime: mtime, sig: sig}
 	signMu.Unlock()
-	return unsigned, adhoc, authority
+	return sig
 }
 
 // parseCodesign reads `codesign -dvv` output. ok is false when codesign failed
 // without saying anything about a signature (for example, a missing file).
-func parseCodesign(s string, failed bool) (unsigned, adhoc bool, authority string, ok bool) {
+func parseCodesign(s string, failed bool) (signature, bool) {
 	low := strings.ToLower(s)
 	switch {
 	case strings.Contains(low, "code object is not signed") || strings.Contains(low, "not signed at all"):
-		return true, false, "", true
+		return signature{unsigned: true}, true
 	case strings.Contains(s, "Signature=adhoc") || strings.Contains(low, "(adhoc)"):
-		return false, true, "", true
+		return signature{adhoc: true}, true
 	}
+	var sig signature
 	for _, line := range strings.Split(s, "\n") {
-		if strings.HasPrefix(line, "Authority=") && authority == "" {
-			authority = strings.TrimPrefix(line, "Authority=")
+		if strings.HasPrefix(line, "Authority=") && sig.authority == "" {
+			sig.authority = strings.TrimPrefix(line, "Authority=")
+		}
+		if t := strings.TrimPrefix(line, "TeamIdentifier="); t != line && t != "not set" {
+			sig.team = t
 		}
 	}
-	if failed && authority == "" && !strings.Contains(s, "CodeDirectory") && !strings.Contains(s, "TeamIdentifier=") {
-		return false, false, "", false
+	if failed && sig.authority == "" && !strings.Contains(s, "CodeDirectory") && !strings.Contains(s, "TeamIdentifier=") {
+		return signature{}, false
 	}
-	return false, false, authority, true
+	return sig, true
 }
 
 func shortAuthority(a string) string {

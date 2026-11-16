@@ -1,0 +1,35 @@
+{
+  "id": "ind-evasivepanda-downloader-runs",
+  "kind": "indicator",
+  "title": "Starts the same program at login as Evasive Panda downloader",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "is": [
+        "~/Library/Containers/CalendarFocusEXT/Monlam_Grand_Dictionary"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "Objective-See report on EvasivePanda Downloader",
+      "url": "https://objective-see.org/blog/blog_0x7D.html"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "~/Library/Containers/CalendarFocusEXT/Monlam_Grand_Dictionary"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/Applications/Example.app/Contents/MacOS/Example"
+      }
+    ]
+  }
+}

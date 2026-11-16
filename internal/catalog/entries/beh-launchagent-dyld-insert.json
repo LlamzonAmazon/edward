@@ -1,0 +1,37 @@
+{
+  "id": "beh-launchagent-dyld-insert",
+  "kind": "behavior",
+  "title": "Starts a program at login with an extra library loaded into it",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Environment",
+      "contains": [
+        "DYLD_INSERT_LIBRARIES"
+      ]
+    }
+  ],
+  "technique": "T1574.006",
+  "reports": [
+    {
+      "name": "MITRE ATT&CK T1574.006 Dynamic Linker Hijacking",
+      "url": "https://attack.mitre.org/techniques/T1574/006/"
+    }
+  ],
+  "added": "2026-11-16",
+  "tests": {
+    "match": [
+      {
+        "Environment": "DYLD_INSERT_LIBRARIES"
+      },
+      {
+        "Environment": "PATH, DYLD_INSERT_LIBRARIES"
+      }
+    ],
+    "noMatch": [
+      {
+        "Environment": "PATH, HOME"
+      }
+    ]
+  }
+}

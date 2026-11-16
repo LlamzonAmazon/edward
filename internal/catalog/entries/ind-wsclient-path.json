@@ -1,0 +1,35 @@
+{
+  "id": "ind-wsclient-path",
+  "kind": "indicator",
+  "title": "Runs from the same path as WSClient",
+  "source": "processes",
+  "when": [
+    {
+      "fact": "Path",
+      "is": [
+        "~/Library/Application Support/WindowServer/WindowServer"
+      ]
+    }
+  ],
+  "technique": "T1036.005",
+  "reports": [
+    {
+      "name": "Objective-See report on WSClient",
+      "url": "https://objective-see.org/blog/blog_0x77.html"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Path": "~/Library/Application Support/WindowServer/WindowServer"
+      }
+    ],
+    "noMatch": [
+      {
+        "Path": "/System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+      }
+    ]
+  }
+}

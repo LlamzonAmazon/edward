@@ -207,6 +207,7 @@ func (r *Runner) commit(mut func(), meta map[string]playbook.Meta, takeLogin, ta
 		SkipLogin:     skipLogin,
 		SkipDisguised: skipDisguised,
 		Meta:          meta,
+		Home:          r.home,
 	})
 	r.store.Findings = out.Findings
 	r.store.States = out.States

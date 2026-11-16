@@ -119,7 +119,7 @@
       ]
     },
     "categoryId": {
-      "enum": ["exposed", "unknownAddress", "hidden", "disguised", "login", "unsigned"]
+      "enum": ["exposed", "unknownAddress", "hidden", "disguised", "login", "unsigned", "known"]
     },
     "pair": {
       "type": "array",

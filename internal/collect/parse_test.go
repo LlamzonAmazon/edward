@@ -121,17 +121,17 @@ func TestParseCodesign(t *testing.T) {
 		file                string
 		failed              bool
 		unsigned, adhoc, ok bool
-		authority           string
+		authority, team     string
 	}{
-		{"codesign-devid.txt", false, false, false, true, "Developer ID Application: Example Corp (ABCDE12345)"},
-		{"codesign-adhoc.txt", false, false, true, true, ""},
-		{"codesign-unsigned.txt", true, true, false, true, ""},
-		{"codesign-missing.txt", true, false, false, false, ""},
+		{"codesign-devid.txt", false, false, false, true, "Developer ID Application: Example Corp (ABCDE12345)", "ABCDE12345"},
+		{"codesign-adhoc.txt", false, false, true, true, "", ""},
+		{"codesign-unsigned.txt", true, true, false, true, "", ""},
+		{"codesign-missing.txt", true, false, false, false, "", ""},
 	}
 	for _, c := range cases {
-		u, a, auth, ok := parseCodesign(fixture(t, c.file), c.failed)
-		if u != c.unsigned || a != c.adhoc || ok != c.ok || auth != c.authority {
-			t.Fatalf("%s: unsigned=%v adhoc=%v ok=%v authority=%q", c.file, u, a, ok, auth)
+		sig, ok := parseCodesign(fixture(t, c.file), c.failed)
+		if sig.unsigned != c.unsigned || sig.adhoc != c.adhoc || ok != c.ok || sig.authority != c.authority || sig.team != c.team {
+			t.Fatalf("%s: %+v ok=%v", c.file, sig, ok)
 		}
 	}
 	if got := shortAuthority("Developer ID Application: Example Corp (ABCDE12345)"); got != "Example Corp" {

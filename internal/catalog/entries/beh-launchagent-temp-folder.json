@@ -1,0 +1,45 @@
+{
+  "id": "beh-launchagent-temp-folder",
+  "kind": "behavior",
+  "title": "Starts a program from a temporary folder at login",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "prefix": [
+        "/tmp/",
+        "/private/tmp/",
+        "/var/tmp/",
+        "/private/var/tmp/",
+        "/var/folders/",
+        "/private/var/folders/"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "MITRE ATT&CK T1543.001 Launch Agent",
+      "url": "https://attack.mitre.org/techniques/T1543/001/"
+    }
+  ],
+  "added": "2026-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "/private/tmp/.u/agent"
+      },
+      {
+        "Runs": "/var/folders/xy/T/run"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/opt/homebrew/bin/node"
+      },
+      {
+        "Runs": "~/Library/Application Support/Tool/tool"
+      }
+    ]
+  }
+}

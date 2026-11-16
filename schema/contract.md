@@ -61,8 +61,8 @@ Run as the installing user. No shell. Fixed argument lists. `LANG=C`. Timeouts o
 
 - Processes, every 5s: `/bin/ps` `-axo` `pid=,ppid=,user=,etime=,comm=`. Command line from `/bin/ps` `-axo` `pid=,command=` for the current user only. Redact before store. Item id: `p-{name}-{path}`. Facts: Path, User, Started by, Up for.
 - Connections, every 15s: `/usr/sbin/lsof` `-nP` `-iTCP` `-iUDP` `-FpcunPT`. Item id: `c-{name}-{address}`. Facts: Program, Address, Direction (`Listening`, `Inbound` or `Outbound`; `Inbound` is a connected socket on a port this user listens on, shown as `{peer host} → :{port}`), Open for, Protocol, and the trust facts under the `exposed` rule. Listen address `*` means all interfaces.
-- Apps, every 10 min: list `/Applications`, `$HOME/Applications`, Homebrew prefix (`/opt/homebrew/opt` or `/usr/local/opt`). Read each app `Info.plist` with `howett.net/plist`. Signature via `/usr/bin/codesign` `-dv` `--` `{path}` (local only). Item id: `a-{name}`. Facts: Path, Version, From.
-- Startup, every 10 min: `$HOME/Library/LaunchAgents` plists only. macOS 13 and later keep login items in a root-only store, so they are not read. Item id: `s-{name}`. Facts: Kind, Runs.
+- Apps, every 10 min: list `/Applications`, `$HOME/Applications`, Homebrew prefix (`/opt/homebrew/opt` or `/usr/local/opt`). Read each app `Info.plist` with `howett.net/plist`. Signature via `/usr/bin/codesign` `-dv` `--` `{path}` (local only). Item id: `a-{name}`. Facts: Path, Version, From, Signature, and Bundle ID (`CFBundleIdentifier`) and Team ID (`TeamIdentifier` from codesign) when present. macOS itself is the item `a-macOS`, read from `/System/Library/CoreServices/SystemVersion.plist`, with Kind `Operating system`.
+- Startup, every 10 min: `$HOME/Library/LaunchAgents` plists only. macOS 13 and later keep login items in a root-only store, so they are not read. Item id: `s-{name}`. Facts: Kind, Label, Runs, and Environment: the names of the plist's `EnvironmentVariables`, sorted and comma-separated. Values are never read into the store.
 - Files, every 60s, only when `filesOn`: list those three directories. Do not walk. Do not hash. Do not read contents. Kind from extension and mode. Item id: `f-{path}`. Facts: Path, Kind, Saved.
 
 Host name: `scutil --get ComputerName` if it runs, else hostname. OS from `sw_vers`. User from the process uid.
@@ -71,7 +71,7 @@ Parent chain: walk ppid through the process list. Names, not pids, in `chain`.
 
 Links: join by path or program name across sources (a listener to its process, a startup item to its process or app, an app to its process).
 
-## Playbook (six rules)
+## Playbook (seven rules)
 
 Evaluate in code after each snapshot. A finding id is stable: `{category}-{dismissalKey}`.
 
@@ -86,6 +86,10 @@ Raise only if absent from the first successful baseline:
 
 5. `login`: startup item id not in `baseline.startupIds`. First successful startup collect fills the baseline and raises nothing that pass.
 6. `disguised`: file whose name has two extensions and the last one is executable-ish (`command`, `app`, `exe`, `scptd`, `tool`, `sh`, `bin`) and id not in `baseline.fileIds`. First successful files collect fills `baseline.fileIds`.
+
+Raise from the catalog (`internal/catalog`, described in `internal/catalog/README.md`):
+
+7. `known`: an app, startup item, process or connection whose facts match one or more unexpired catalog entries. One finding per item. Value is the item name; for an item that matched only version entries, the name and version, like `Google Chrome 130.0`. Facts list the entries matched (indicators, then behaviors, then versions most recently added to KEV first; three shown, then `and N more`), and for versions the count and `Fixed in {version}`. Quoted adds a `Report` row per source link (up to 6) and a `Technique` row with the ATT&CK IDs. The dismissal key is `path|user|{8 hex of sha256 of the matched entry ids}`, so a cleared finding comes back when the set of matched entries changes.
 
 Dismissal key: listeners and connections use `path|port|user`. Others use `path|user`. Cleared findings stay `status: "cleared"` and are omitted from new raises.
 

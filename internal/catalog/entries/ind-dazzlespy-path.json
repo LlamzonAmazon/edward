@@ -1,0 +1,35 @@
+{
+  "id": "ind-dazzlespy-path",
+  "kind": "indicator",
+  "title": "Runs from the same path as DazzleSpy",
+  "source": "processes",
+  "when": [
+    {
+      "fact": "Path",
+      "is": [
+        "~/.local/softwareupdate"
+      ]
+    }
+  ],
+  "technique": "T1036.005",
+  "reports": [
+    {
+      "name": "ESET report on DazzleSpy",
+      "url": "https://www.welivesecurity.com/2022/01/25/watering-hole-deploys-new-macos-malware-dazzlespy-asia/"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Path": "~/.local/softwareupdate"
+      }
+    ],
+    "noMatch": [
+      {
+        "Path": "/usr/sbin/softwareupdate"
+      }
+    ]
+  }
+}

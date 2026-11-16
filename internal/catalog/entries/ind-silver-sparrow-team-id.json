@@ -1,0 +1,39 @@
+{
+  "id": "ind-silver-sparrow-team-id",
+  "kind": "indicator",
+  "title": "Signed by the same developer team as Silver Sparrow",
+  "source": "apps",
+  "when": [
+    {
+      "fact": "Team ID",
+      "is": [
+        "5834W6MYX3",
+        "MSZ3ZH74RK"
+      ]
+    }
+  ],
+  "technique": "T1553.002",
+  "reports": [
+    {
+      "name": "Red Canary report on Silver Sparrow",
+      "url": "https://redcanary.com/blog/clipping-silver-sparrows-wings/"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Team ID": "5834W6MYX3"
+      },
+      {
+        "Team ID": "MSZ3ZH74RK"
+      }
+    ],
+    "noMatch": [
+      {
+        "Team ID": "EQHXZ8M8AV"
+      }
+    ]
+  }
+}

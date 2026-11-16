@@ -1,0 +1,42 @@
+{
+  "id": "beh-launchagent-downloader",
+  "kind": "behavior",
+  "title": "Downloads something at login",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "is": [
+        "/usr/bin/curl",
+        "/usr/bin/nscurl",
+        "/usr/local/bin/wget",
+        "/opt/homebrew/bin/wget",
+        "/opt/homebrew/bin/curl"
+      ]
+    }
+  ],
+  "technique": "T1105",
+  "reports": [
+    {
+      "name": "MITRE ATT&CK T1105 Ingress Tool Transfer",
+      "url": "https://attack.mitre.org/techniques/T1105/"
+    },
+    {
+      "name": "MITRE ATT&CK T1543.001 Launch Agent",
+      "url": "https://attack.mitre.org/techniques/T1543/001/"
+    }
+  ],
+  "added": "2026-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "/usr/bin/curl"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/usr/bin/caffeinate"
+      }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "ind-zuru-runs",
+  "kind": "indicator",
+  "title": "Starts the same program at login as ZuRu",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "is": [
+        "/Users/Shared/.fseventsd"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "Objective-See report on ZuRu",
+      "url": "https://objective-see.org/blog/blog_0x7D.html"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "/Users/Shared/.fseventsd"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+      }
+    ]
+  }
+}

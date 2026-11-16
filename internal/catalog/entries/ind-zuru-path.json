@@ -1,0 +1,35 @@
+{
+  "id": "ind-zuru-path",
+  "kind": "indicator",
+  "title": "Runs from the same path as ZuRu",
+  "source": "processes",
+  "when": [
+    {
+      "fact": "Path",
+      "is": [
+        "/Users/Shared/.fseventsd"
+      ]
+    }
+  ],
+  "technique": "T1036.005",
+  "reports": [
+    {
+      "name": "Objective-See report on ZuRu",
+      "url": "https://objective-see.org/blog/blog_0x7D.html"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Path": "/Users/Shared/.fseventsd"
+      }
+    ],
+    "noMatch": [
+      {
+        "Path": "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+      }
+    ]
+  }
+}

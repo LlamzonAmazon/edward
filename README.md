@@ -4,7 +4,7 @@
   <img src="media/logo/edward-dark.png" alt="EDwaRd" width="160" />
 </p>
 
-EDwaRd is a security monitor for macOS that your coding agent can read. A small Go program runs in the background as you. Every few seconds it lists the programs running on your Mac, the network ports they listen on and connect to, your apps and their code signatures, and what starts at login. It raises findings from six rules and writes everything to one local JSON file. You review the findings on a page at [http://127.0.0.1:43393](http://127.0.0.1:43393), and your agent (Claude Code, Codex, Cursor and others) answers questions such as "is anything sketchy on my laptop?" from the same file.
+EDwaRd is a security monitor for macOS that your coding agent can read. A small Go program runs in the background as you. Every few seconds it lists the programs running on your Mac, the network ports they listen on and connect to, your apps and their code signatures, and what starts at login. It raises findings from six rules and a catalog of checks drawn from public security sources, and writes everything to one local JSON file. You review the findings on a page at [http://127.0.0.1:43393](http://127.0.0.1:43393), and your agent (Claude Code, Codex, Cursor and others) answers questions such as "is anything sketchy on my laptop?" from the same file.
 
 EDwaRd is not antivirus or an EDR. It has no kernel sensor, no malware signatures and no blocking. It shows what a normal user on this Mac can already see, and it gives you and your agent a reason to look closer.
 
@@ -102,7 +102,7 @@ On a Mac you reach over SSH, forward the page to your own machine with `ssh -L 4
 | Starts at login | every 10 minutes | your LaunchAgents in `~/Library/LaunchAgents` |
 | New files | every minute, off until you turn it on | names, sizes and times in Downloads, Desktop and `/tmp` |
 
-## The six rules
+## What it raises
 
 1. **Open to your network:** a program listening on an address other than loopback. A program's UDP sockets on temporary ports become one finding when the running process passes a signature check for Apple or Developer ID code; any other UDP socket is raised on its own. A socket bound to an address the Mac no longer has raises nothing.
 2. **Unknown connection:** an outbound connection to a raw IP, on a port other than 22, 53, 80 or 443.
@@ -110,6 +110,7 @@ On a Mac you reach over SSH, forward the page to your own machine with `ssh -L 4
 4. **Unsigned app:** an app that `codesign` reports as unsigned or ad-hoc signed.
 5. **New login item:** a LaunchAgent that was not there on the first scan.
 6. **Disguised file:** a new file with two extensions whose last one is executable, such as `invoice.pdf.app`.
+7. **Matches a security report:** an app, login item, process or connection that matches an entry in the catalog. The catalog holds versions of apps and macOS with bugs in CISA's Known Exploited Vulnerabilities list (version ranges from NVD), LaunchAgent behaviors from MITRE ATT&CK techniques, and names and paths from published Mac malware research. The finding links to each source. The catalog is compiled into each release, so EDwaRd checks it without a network connection. See [internal/catalog/README.md](internal/catalog/README.md).
 
 <p align="center">
   <img src="media/mock/readme-finding.png" alt="Finding dialog with both readings on fixture data" width="900" />
@@ -120,7 +121,7 @@ On a Mac you reach over SSH, forward the page to your own machine with `ssh -L 4
 - It polls snapshots, so a program that runs for less than a few seconds may never appear.
 - It cannot tell you whether a file is malicious, and it never blocks or deletes anything.
 - It cannot see other users' processes, login items added in System Settings (macOS keeps them where only root can read), firewall rules, device management profiles or protected logs.
-- It never reads environment variables, SSH keys, keychains, browser profiles, mail, documents or file contents.
+- It never reads environment variable values, SSH keys, keychains, browser profiles, mail, documents or file contents.
 
 ## Privacy and security
 
@@ -163,7 +164,7 @@ Uninstall does not touch your project files, other skills, other LaunchAgents or
 ```mermaid
 flowchart LR
   subgraph mac["Your Mac, running as you"]
-    C["Collectors<br/>ps, lsof, codesign, plists"] --> R["Redact + six rules"]
+    C["Collectors<br/>ps, lsof, codesign, plists"] --> R["Redact + seven rules"]
     R --> S[("store.json")]
     S --> P["Page on 127.0.0.1:43393"]
     P -- "clear, notes, settings" --> S
@@ -195,7 +196,8 @@ make release      # universal tarball and SHA256SUMS in dist/
 | --- | --- |
 | `cmd/edward` | CLI: `serve`, `status`, `open`, `uninstall`, `version` |
 | `internal/collect` | Collectors, the snapshot loop and UDP trust checks |
-| `internal/playbook` | The six rules |
+| `internal/playbook` | The seven rules |
+| `internal/catalog` | Catalog entries, matching, and the KEV and NVD draft tool |
 | `internal/redact` | Command-line redaction |
 | `internal/agents` | Agent table, skill writes, migration, block markers |
 | `internal/lifecycle` | Turn off and uninstall |

@@ -1,0 +1,35 @@
+{
+  "id": "ind-silver-sparrow-label",
+  "kind": "indicator",
+  "title": "Same LaunchAgent label as Silver Sparrow",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Label",
+      "is": [
+        "init_verx"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "Red Canary report on Silver Sparrow",
+      "url": "https://redcanary.com/blog/clipping-silver-sparrows-wings/"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Label": "init_verx"
+      }
+    ],
+    "noMatch": [
+      {
+        "Label": "com.example.agent"
+      }
+    ]
+  }
+}

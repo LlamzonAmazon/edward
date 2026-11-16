@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LlamzonAmazon/edward/internal/catalog"
 	"github.com/LlamzonAmazon/edward/internal/store"
 )
 
@@ -147,5 +148,57 @@ func TestUDPGroupingNeedsEveryFact(t *testing.T) {
 		if len(res.Findings) != 1 || !strings.HasSuffix(res.Findings[0].Value, "on port "+strings.TrimPrefix(c.Detail, "*:")) {
 			t.Fatalf("%s: want one finding for the socket itself, got %#v", name, res.Findings)
 		}
+	}
+}
+
+func TestKnownReportRule(t *testing.T) {
+	tmp := store.Item{ID: "s-com.example.u", Name: "com.example.u", Facts: [][]string{{"Kind", "LaunchAgent"}, {"Label", "com.example.u"}, {"Runs", "/private/tmp/.u/agent"}}}
+	plain := store.Item{ID: "s-com.example.ok", Name: "com.example.ok", Facts: [][]string{{"Kind", "LaunchAgent"}, {"Label", "com.example.ok"}, {"Runs", "/opt/homebrew/bin/node"}}}
+	res := Evaluate(Input{Startup: []store.Item{tmp, plain}, Baseline: store.Baseline{StartupIds: []string{tmp.ID, plain.ID}}})
+	var known []store.Finding
+	for _, f := range res.Findings {
+		if f.Category == "known" {
+			known = append(known, f)
+		}
+	}
+	if len(known) != 1 || known[0].ItemID != tmp.ID {
+		t.Fatalf("want one known finding for the /tmp agent, got %+v", known)
+	}
+	f := known[0]
+	if !strings.Contains(strings.Join(f.Facts, "|"), "temporary folder") {
+		t.Errorf("facts do not name the entry: %v", f.Facts)
+	}
+	var report, technique bool
+	for _, q := range f.Quoted {
+		report = report || (q[0] == "Report" && strings.HasPrefix(q[1], "https://attack.mitre.org/"))
+		technique = technique || (q[0] == "Technique" && strings.Contains(q[1], "T1543.001"))
+	}
+	if !report || !technique {
+		t.Errorf("quoted rows lack the report or technique: %v", f.Quoted)
+	}
+	if res.States[f.ID].Status != "raised" {
+		t.Errorf("status = %q", res.States[f.ID].Status)
+	}
+
+	res = Evaluate(Input{Startup: []store.Item{tmp}, Dismissals: []store.Dismissal{{Key: DismissalKey(f)}}})
+	if res.States[f.ID].Status != "cleared" {
+		t.Error("a cleared known finding came back with the same matches")
+	}
+}
+
+func TestFixedInClearsEveryMatchedRange(t *testing.T) {
+	e := func(ranges ...catalog.Range) catalog.Entry {
+		return catalog.Entry{When: []catalog.Cond{{Fact: "Version", Versions: ranges}}}
+	}
+	matched := []catalog.Entry{
+		e(catalog.Range{Below: "138.0.7204.92"}),
+		e(catalog.Range{From: "139.0", Below: "139.0.7258.5"}),
+		e(catalog.Range{Below: "140.0.7339.80"}),
+	}
+	if got := fixedIn(matched, "137.0.1"); got != "140.0.7339.80" {
+		t.Fatalf("fixedIn = %q", got)
+	}
+	if got := fixedIn(matched, "garbage"); got != "" {
+		t.Fatalf("fixedIn on an unreadable version = %q", got)
 	}
 }

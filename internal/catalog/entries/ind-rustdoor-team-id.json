@@ -1,0 +1,35 @@
+{
+  "id": "ind-rustdoor-team-id",
+  "kind": "indicator",
+  "title": "Signed by the same developer team as RustDoor",
+  "source": "apps",
+  "when": [
+    {
+      "fact": "Team ID",
+      "is": [
+        "X43S7HF655"
+      ]
+    }
+  ],
+  "technique": "T1553.002",
+  "reports": [
+    {
+      "name": "Bitdefender report on RustDoor",
+      "url": "https://www.bitdefender.com/blog/labs/new-macos-backdoor-written-in-rust-shows-possible-link-with-windows-ransomware-group/"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Team ID": "X43S7HF655"
+      }
+    ],
+    "noMatch": [
+      {
+        "Team ID": "EQHXZ8M8AV"
+      }
+    ]
+  }
+}

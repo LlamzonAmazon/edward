@@ -1,0 +1,38 @@
+{
+  "id": "beh-launchagent-osascript",
+  "kind": "behavior",
+  "title": "Runs an AppleScript at login",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "is": [
+        "/usr/bin/osascript"
+      ]
+    }
+  ],
+  "technique": "T1059.002",
+  "reports": [
+    {
+      "name": "MITRE ATT&CK T1059.002 AppleScript",
+      "url": "https://attack.mitre.org/techniques/T1059/002/"
+    },
+    {
+      "name": "MITRE ATT&CK T1543.001 Launch Agent",
+      "url": "https://attack.mitre.org/techniques/T1543/001/"
+    }
+  ],
+  "added": "2026-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "/usr/bin/osascript"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/usr/bin/open"
+      }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "ind-flexibleferret-runs",
+  "kind": "indicator",
+  "title": "Starts the same program at login as FlexibleFerret",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Runs",
+      "is": [
+        "/private/var/tmp/logd"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "Objective-See report on FlexibleFerret",
+      "url": "https://objective-see.org/blog/blog_0x84.html"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Runs": "/private/var/tmp/logd"
+      }
+    ],
+    "noMatch": [
+      {
+        "Runs": "/usr/libexec/logd"
+      }
+    ]
+  }
+}

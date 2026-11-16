@@ -1,0 +1,35 @@
+{
+  "id": "ind-flexibleferret-label",
+  "kind": "indicator",
+  "title": "Same LaunchAgent label as FlexibleFerret",
+  "source": "startup",
+  "when": [
+    {
+      "fact": "Label",
+      "is": [
+        "com.zoom"
+      ]
+    }
+  ],
+  "technique": "T1543.001",
+  "reports": [
+    {
+      "name": "Objective-See report on FlexibleFerret",
+      "url": "https://objective-see.org/blog/blog_0x84.html"
+    }
+  ],
+  "added": "2026-11-16",
+  "expires": "2028-11-16",
+  "tests": {
+    "match": [
+      {
+        "Label": "com.zoom"
+      }
+    ],
+    "noMatch": [
+      {
+        "Label": "com.example.agent"
+      }
+    ]
+  }
+}
