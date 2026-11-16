@@ -92,7 +92,7 @@ func TestUnknownAddressSkipsLoopback(t *testing.T) {
 		t.Fatalf("loopback outbound should not raise, got %#v", out.Findings)
 	}
 	c2 := Evaluate(Input{
-		Connections: []store.Item{conn("updater", "91.215.85.17:8443", "Outbound")},
+		Connections: []store.Item{conn("updater", "203.0.113.17:8443", "Outbound")},
 		Processes:   []store.Item{proc("updater", "/tmp/updater", "thomas")},
 		Meta:        map[string]Meta{"p-updater-/tmp/updater": {Path: "/tmp/updater", User: "thomas"}},
 	})

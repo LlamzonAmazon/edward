@@ -12,7 +12,7 @@ import (
 const chromeExe = "/Applications/Google Chrome.app/Contents/Frameworks/Helpers/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper"
 
 // stubTrust makes PID 630 a verified Google process and every other PID fail
-// the signature check, with 10.0.0.33 as the only LAN address.
+// the signature check, with 10.0.0.23 as the only LAN address.
 func stubTrust(t *testing.T) {
 	t.Helper()
 	oldVerify, oldLocal, oldFirst := verifyPID, localAddrs, ephemeralFirst
@@ -22,7 +22,7 @@ func stubTrust(t *testing.T) {
 		}
 		return signer{}, false
 	}
-	localAddrs = func() map[string]bool { return map[string]bool{"127.0.0.1": true, "10.0.0.33": true} }
+	localAddrs = func() map[string]bool { return map[string]bool{"127.0.0.1": true, "10.0.0.23": true} }
 	ephemeralFirst = func() int { return 49152 }
 	signerCache = map[int]signerEntry{}
 	t.Cleanup(func() {
@@ -125,8 +125,8 @@ func TestParseSignerAndEtime(t *testing.T) {
 			t.Fatalf("etimeDuration(%q) = %v", in, got)
 		}
 	}
-	for host, gone := range map[string]bool{"172.20.10.5": true, "10.0.0.33": false, "*": false, "fe80:4::1": false, "not-an-ip": false} {
-		if addressGone(host, map[string]bool{"10.0.0.33": true}) != gone {
+	for host, gone := range map[string]bool{"172.20.10.5": true, "10.0.0.23": false, "*": false, "fe80:4::1": false, "not-an-ip": false} {
+		if addressGone(host, map[string]bool{"10.0.0.23": true}) != gone {
 			t.Fatalf("addressGone(%q) != %v", host, gone)
 		}
 	}

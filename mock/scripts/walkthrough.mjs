@@ -1,9 +1,12 @@
 import { chromium } from "playwright-core";
+const url = process.env.MOCK_URL ?? "http://127.0.0.1:5173/";
 
 const dir = process.argv[2] || "/tmp/video";
 const size = { width: 1440, height: 900 };
-const browser = await chromium.launch({ executablePath: "/usr/local/bin/google-chrome" });
+const browser = await chromium.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" });
 const context = await browser.newContext({ viewport: size, recordVideo: { dir, size } });
+// Fixture data only: a running EDwaRd answering /api would put this Mac in the shots.
+await context.route("**/api/**", (r) => r.abort());
 await context.addInitScript(() => {
   window.addEventListener("DOMContentLoaded", () => {
     const c = document.createElement("div");
@@ -33,11 +36,14 @@ const go = async (loc, { click = true, pause = 500 } = {}) => {
 };
 
 const open = ".dialog[data-open='true']";
-await page.goto("http://127.0.0.1:5173/");
+await page.goto(url);
 await page.mouse.move(pos.x, pos.y);
 await wait(1800);
 
-await go(page.locator(`${open} .agent-pick`).nth(2), { click: false, pause: 900 });
+// First run starts with no agent picked.
+await go(page.locator(`${open} .toggle[aria-label='Claude Code']`));
+await go(page.locator(`${open} .toggle[aria-label='Codex']`));
+await wait(600);
 await go(page.locator(`${open} .wipe`, { hasText: "Next" }));
 await wait(1400);
 await go(page.locator(`${open} .wipe`, { hasText: "Open System Settings" }));

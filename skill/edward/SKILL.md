@@ -36,7 +36,7 @@ Look into, when any of these is true:
 
 - The category is `known` or `disguised`.
 - `facts` say `Not signed` or `Not verified`.
-- An app the user installed (under `/Applications/` or the home folder) listens on one port on every address, with a value like `Live on port 20909`. Other devices on the network can connect to it.
+- An app the user installed (under `/Applications/` or the home folder) listens on one port on every address, with a value like `node on port 3000`. Other devices on the network can connect to it.
 - The category is `hidden` and no program in `chain` installs into that folder.
 - A `login` item whose path is not inside an app under `/Applications/`.
 - One program connects to several addresses and one is in a different range from the rest. Put that one connection here and the others under Clear.
@@ -65,8 +65,8 @@ Then list every `raised` finding in the order the page lists them under "N raise
 Write each category name that has findings, then one line per finding. Number the lines across the whole reply, so the numbers match the page from top to bottom. Start each line with **Clear** or **Look into**, then the finding's `value` as the page shows it, then the reason in a few words:
 
 Open to your network
-1. **Clear**: rapportd on port 49156. Apple program in a folder macOS protects.
-5. **Look into**: Live on port 20909. An app you installed, open to every device on your network.
+1. **Clear**: rapportd on port 49152. Apple program in a folder macOS protects.
+5. **Look into**: node on port 3000. A program you run, open to every device on your network.
 
 If any findings are `asked`, list them the same way after the categories, under "Already asked about".
 

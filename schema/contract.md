@@ -78,7 +78,7 @@ Evaluate in code after each snapshot. A finding id is stable: `{category}-{dismi
 Raise whenever the state is true (unless dismissed):
 
 1. `exposed`: listening on an address that is not `127.0.0.1` or `::1`. Value like `node on port 3000`. UDP sockets with no peer carry trust facts, because lsof shows a UDP client and a UDP server the same way: `Bound to` = `An address this Mac no longer has` raises nothing; on a port at or above `net.inet.ip.portrange.first`, `Port range` = `Temporary` and `Signed by` is the signer when `codesign --verify --strict -R=<Apple or Developer ID>` passes for the PID (the running process, so a file replaced after launch fails), else `Not verified`. Sockets with a verified signer, a temporary port and an `Executable` outside hidden folders are grouped into one finding per program, signer and user, value like `Chrome Helper has 9 UDP sockets on temporary ports`, with no port in its id. Every other socket is raised on its own. Connections are linked to processes by PID, never by name.
-2. `unknownAddress`: outbound to a raw IPv4/IPv6 with no hostname, port not in {22, 53, 80, 443}. Value like `updater → 91.215.85.17:8443`.
+2. `unknownAddress`: outbound to a raw IPv4/IPv6 with no hostname, port not in {22, 53, 80, 443}. Value like `updater → 203.0.113.17:8443`.
 3. `hidden`: process path contains a path segment that starts with `.` (hidden folder). Value is the process name.
 4. `unsigned`: app whose codesign says no signature or ad-hoc. Value is the app name.
 

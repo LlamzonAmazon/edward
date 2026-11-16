@@ -93,7 +93,7 @@ func TestParseLsofConnections(t *testing.T) {
 		// Two connections accepted on node's port 3000 from one peer are one item.
 		"node 10.0.0.9 → :3000":                  "Inbound",
 		"Google Chrome Helper *:64330":           "Listening",
-		"Google Chrome Helper 10.0.0.33:52743":   "Listening",
+		"Google Chrome Helper 10.0.0.23:52743":   "Listening",
 		"Google Chrome Helper 172.20.10.5:59379": "Listening",
 		"Google Chrome Helper [fe80:4::1]:61000": "Listening",
 		"Google Chrome Helper 142.250.72.14:443": "Outbound",

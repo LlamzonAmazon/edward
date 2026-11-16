@@ -148,7 +148,7 @@ const proc = (name: string, user: string, parent: string, up: string, path: stri
 
 const processes: Item[] = [
   proc("updater", "thomas", "launchd", "2 d", "~/Library/Application Support/.fluxo/updater", "f-updater-proc"),
-  proc("node", "thomas", "npm", "14 h", "~/code/edward-site/node_modules/.bin/vite"),
+  proc("node", "thomas", "npm", "14 h", "~/code/my-app/node_modules/.bin/vite"),
   proc("npm", "thomas", "zsh", "14 h", "/opt/homebrew/bin/npm"),
   proc("zsh", "thomas", "Terminal", "14 h", "/bin/zsh"),
   proc("Terminal", "thomas", "launchd", "3 d", "/System/Applications/Utilities/Terminal.app"),
@@ -207,7 +207,7 @@ const conn = (name: string, address: string, kind: string, up: string, findingId
 
 const connections: Item[] = [
   conn("node", "0.0.0.0:3000", "Listening", "14 h", "f-node-3000"),
-  conn("updater", "91.215.85.17:8443", "Outbound", "2 d", "f-updater-conn"),
+  conn("updater", "203.0.113.17:8443", "Outbound", "2 d", "f-updater-conn"),
   conn("ollama", "127.0.0.1:11434", "Listening", "3 d"),
   conn("postgres", "127.0.0.1:5432", "Listening", "3 d"),
   conn("Cursor", "127.0.0.1:52817", "Listening", "3 d"),
@@ -240,9 +240,9 @@ const files: Item[] = [
   file("Fluxo-PDF-2.1.dmg", "~/Downloads/Fluxo-PDF-2.1.dmg", "3 d ago", "Disk image, 48 MB"),
   file("updater", "~/Library/Application Support/.fluxo/updater", "3 d ago", "Program, run by com.fluxo.sync"),
   file("Screenshot 2026-11-06 at 22.14.03.png", "~/Desktop/Screenshot 2026-11-06 at 22.14.03.png", "7 h ago", "Image"),
-  file("resume-final-v3.pdf", "~/Desktop/resume-final-v3.pdf", "2 d ago", "PDF"),
+  file("tax-return-2025.pdf", "~/Desktop/tax-return-2025.pdf", "2 d ago", "PDF"),
   file("Ollama-darwin.zip", "~/Downloads/Ollama-darwin.zip", "3 w ago", "Archive"),
-  file("edward-notes.md", "~/Desktop/edward-notes.md", "1 h ago", "Text"),
+  file("notes.md", "~/Desktop/notes.md", "1 h ago", "Text"),
   file("vite-dev-6f2a", "/tmp/vite-dev-6f2a", "14 h ago", "Folder, used by node"),
   file("com.fluxo.sync.plist", "~/Library/LaunchAgents/com.fluxo.sync.plist", "3 d ago", "Startup item"),
   file("kubeconfig-staging.yaml", "~/Downloads/kubeconfig-staging.yaml", "5 d ago", "Config, contents not read"),
@@ -436,22 +436,22 @@ export const findings: Finding[] = [
     facts: ["Up for 14 hours", "Started by you", "0.0.0.0:3000"],
     chain: ["Terminal", "zsh", "npm run dev", "node"],
     quoted: [
-      ["Path", "~/code/edward-site/node_modules/.bin/vite"],
+      ["Path", "~/code/my-app/node_modules/.bin/vite"],
       ["Command", "node vite --host 0.0.0.0"],
     ],
   },
   {
     id: "f-updater-conn",
     source: "connections",
-    itemId: "c-updater-91.215.85.17:8443",
+    itemId: "c-updater-203.0.113.17:8443",
     category: "unknownAddress",
-    value: "updater → 91.215.85.17:8443",
+    value: "updater → 203.0.113.17:8443",
     subject: "updater",
     facts: ["Open for 2 days", "No hostname", "Every few minutes"],
     chain: ["launchd", "com.fluxo.sync", "updater"],
     quoted: [
       ["Path", "~/Library/Application Support/.fluxo/updater"],
-      ["Remote", "91.215.85.17:8443"],
+      ["Remote", "203.0.113.17:8443"],
     ],
     story: fluxoStory,
   },

@@ -9,17 +9,17 @@ import (
 
 func TestPlanClear(t *testing.T) {
 	findings := []store.Finding{
-		{ID: "exposed-rapportd|3722|u", Value: "rapportd on port 3722"},
+		{ID: "exposed-rapportd|49152|u", Value: "rapportd on port 49152"},
 		{ID: "unknownAddress-Notes|993|u", Value: "Notes → a:993"},
 		{ID: "unknownAddress-Notes|993|u", Value: "Notes → b:993"},
-		{ID: "exposed-Live|20909|u", Value: "Live on port 20909"},
+		{ID: "exposed-node|3000|u", Value: "node on port 3000"},
 	}
 	set, skipped, missing := planClear(findings, []string{
-		"rapportd on port 3722",
+		"rapportd on port 49152",
 		"Notes → a:993",
-		"rapportd on port 49739",
+		"rapportd on port 49153",
 	})
-	wantSet := []idValues{{"exposed-rapportd|3722|u", []string{"rapportd on port 3722"}}}
+	wantSet := []idValues{{"exposed-rapportd|49152|u", []string{"rapportd on port 49152"}}}
 	if !reflect.DeepEqual(set, wantSet) {
 		t.Fatalf("set = %v, want %v", set, wantSet)
 	}
@@ -27,7 +27,7 @@ func TestPlanClear(t *testing.T) {
 	if !reflect.DeepEqual(skipped, wantSkipped) {
 		t.Fatalf("skipped = %v, want %v", skipped, wantSkipped)
 	}
-	if !reflect.DeepEqual(missing, []string{"rapportd on port 49739"}) {
+	if !reflect.DeepEqual(missing, []string{"rapportd on port 49153"}) {
 		t.Fatalf("missing = %v", missing)
 	}
 }

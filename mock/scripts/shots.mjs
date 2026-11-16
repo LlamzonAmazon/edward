@@ -1,8 +1,11 @@
 import { chromium } from "playwright-core";
+const url = process.env.MOCK_URL ?? "http://127.0.0.1:5173/";
 
 const out = process.argv[2] || "/tmp/shots";
-const browser = await chromium.launch({ executablePath: "/usr/local/bin/google-chrome" });
+const browser = await chromium.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" });
 const page = await browser.newPage({ viewport: { width: 1600, height: 960 }, deviceScaleFactor: 2 });
+// Fixture data only: a running EDwaRd answering /api would put this Mac in the shots.
+await page.route("**/api/**", (r) => r.abort());
 const open = ".dialog[data-open='true']";
 const settle = () => page.waitForTimeout(700);
 const shot = async (name) => {
@@ -12,7 +15,7 @@ const shot = async (name) => {
   console.log("saved", name);
 };
 
-await page.goto("http://127.0.0.1:5173/");
+await page.goto(url);
 await page.waitForTimeout(900);
 await shot("01-first-run");
 
@@ -96,9 +99,10 @@ await settle();
 await page.locator(".node--hub[aria-label='New files']").click();
 await shot("16-new-files-off");
 
-await page.goto("http://127.0.0.1:5173/?busy");
+await page.goto(`${url}?busy`);
 await page.waitForTimeout(900);
-await page.keyboard.press("Escape");
+await page.locator(`${open} .wipe`, { hasText: "Skip" }).click();
+await page.waitForTimeout(4600);
 await shot("10-many-raised");
 
 await page.locator(".nav__more").click();
