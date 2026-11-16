@@ -116,6 +116,22 @@ On a Mac you reach over SSH, forward the page to your own machine with `ssh -L 4
   <img src="media/mock/readme-finding.png" alt="Finding dialog with both readings on fixture data" width="900" />
 </p>
 
+## Detection sources
+
+The catalog behind rule 7 is built from public sources. Each entry names its source and links to it, and each is tested in CI with facts it must match and facts it must not match. Version 1.3.0 holds 121 entries.
+
+| Source | What EDwaRd takes from it | Entries |
+| --- | --- | --- |
+| [CISA Known Exploited Vulnerabilities](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | CVEs with confirmed exploitation in macOS, Chrome, Safari, Edge, Firefox, Thunderbird, Acrobat, Acrobat Reader, VMware Fusion and Homebrew Git | 92, for 61 CVEs |
+| [NVD](https://nvd.nist.gov/) | The affected version ranges for each of those CVEs, using only the ranges NVD lists for macOS | (same 92) |
+| [MITRE ATT&CK](https://attack.mitre.org/) | LaunchAgent behaviors: a program run from a temporary, shared or hidden folder, `DYLD_INSERT_LIBRARIES`, `osascript`, and `curl` or `wget` | 6 |
+| Published Mac malware research from [Objective-See](https://objective-see.org/), [Elastic Security Labs](https://www.elastic.co/security-labs), [Red Canary](https://redcanary.com/blog/), [ESET](https://www.welivesecurity.com/), [Intezer](https://intezer.com/blog/) and [Bitdefender](https://www.bitdefender.com/blog/labs/) | LaunchAgent labels, program paths, bundle IDs and signing team IDs for 11 malware families | 23 |
+
+- The KEV entries cover CVEs that CISA added from 2023-09-25 to 2026-11-10 (KEV catalog version 2026.11.13). Older KEV entries are not in the catalog yet.
+- Indicator entries expire 2 years after they are added, because attackers change names and paths. CI fails on an expired entry until it is renewed from a newer source or removed.
+- The catalog changes only with a new release. EDwaRd never downloads it.
+- The entry format and how to add an entry: [internal/catalog/README.md](internal/catalog/README.md).
+
 ## What it does not do
 
 - It polls snapshots, so a program that runs for less than a few seconds may never appear.
