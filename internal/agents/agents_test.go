@@ -106,6 +106,33 @@ func TestDetectBinaryOnPath(t *testing.T) {
 	}
 }
 
+func TestStale(t *testing.T) {
+	home := t.TempDir()
+	if Stale(home, []string{"claude"}) {
+		t.Fatal("a missing skill is not stale")
+	}
+	if _, err := Write(home, []string{"claude"}); err != nil {
+		t.Fatal(err)
+	}
+	if Stale(home, []string{"claude"}) {
+		t.Fatal("the skill this build wrote is not stale")
+	}
+	path := filepath.Join(home, ".claude", "skills", "edward", "SKILL.md")
+	old := strings.Replace(SkillBody(), "\n# EDwaRd\n", "\n# EDwaRd 0.0.1\n", 1)
+	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !Stale(home, []string{"claude"}) {
+		t.Fatal("a skill from another build is stale")
+	}
+	if err := os.WriteFile(path, []byte("---\nname: mine\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if Stale(home, []string{"claude"}) {
+		t.Fatal("a skill EDwaRd did not write is not stale")
+	}
+}
+
 func TestWriteIsIdempotentAndSharesAgentsDir(t *testing.T) {
 	home := t.TempDir()
 	rep, err := Write(home, []string{"codex", "cursor", "opencode", "openclaw", "claude"})

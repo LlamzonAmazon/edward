@@ -367,6 +367,17 @@ func (r *Runner) SetNotes(text string) *store.Store {
 	return r.store.Clone()
 }
 
+// RefreshSkills rewrites the skill for the agents the user chose when an
+// installed copy came from another build, so an upgrade carries the new skill.
+func (r *Runner) RefreshSkills() {
+	r.mu.Lock()
+	ids := append([]string(nil), r.store.HookedAgents...)
+	r.mu.Unlock()
+	if len(ids) > 0 && agents.Stale(r.home, ids) {
+		_, _ = r.Hook(ids)
+	}
+}
+
 func (r *Runner) Hook(agentIDs []string) (*store.Store, error) {
 	rep, err := agents.Write(r.home, agentIDs)
 	r.mu.Lock()

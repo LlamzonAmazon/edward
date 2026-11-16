@@ -39,7 +39,7 @@ To install a specific release instead of the latest:
 curl -fsSL https://raw.githubusercontent.com/LlamzonAmazon/edward/main/install.sh | EDWARD_VERSION=v1.2.0 sh
 ```
 
-Install with the command above, not by downloading the release in a browser. The app is ad-hoc signed and not notarized by Apple, and Gatekeeper blocks an app downloaded in a browser. Running the installer again updates EDwaRd in place and keeps your findings and settings.
+Install with the command above, not by downloading the release in a browser. The app is ad-hoc signed and not notarized by Apple, and Gatekeeper blocks an app downloaded in a browser. Running the installer again updates EDwaRd in place and keeps your findings and settings. When the new version starts, it updates the skill for the agents you chose.
 
 ## First run
 

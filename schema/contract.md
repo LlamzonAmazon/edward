@@ -116,7 +116,7 @@ Do not store the raw command line on a dismissal.
 
 ## Skill
 
-Source: `skill/edward/SKILL.md`, embedded in the binary with `go:embed` (`skill/edward/embed.go`). `{version}` is replaced with the build version. The binary never reads a SKILL.md from disk to decide what to write.
+Source: `skill/edward/SKILL.md`, embedded in the binary with `go:embed` (`skill/edward/embed.go`). `{version}` is replaced with the build version. The binary never reads a SKILL.md from disk to decide what to write. At start, if an EDwaRd-owned SKILL.md for an agent in `hookedAgents` differs from this build's, it runs the same write as `POST /api/hook` with `hookedAgents`.
 
 The skill must:
 

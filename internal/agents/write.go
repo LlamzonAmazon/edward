@@ -237,6 +237,23 @@ func verifySkill(path string, want []byte) error {
 	return nil
 }
 
+// Stale reports whether a selected agent has an EDwaRd SKILL.md that differs
+// from this build's, as after an upgrade. A missing or foreign file is not stale.
+func Stale(home string, agentIDs []string) bool {
+	body := []byte(SkillBody())
+	for _, id := range agentIDs {
+		a, ok := ByID(id)
+		if !ok {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(home, a.SkillDir, "SKILL.md"))
+		if err == nil && Owned(b) && !bytes.Equal(b, body) {
+			return true
+		}
+	}
+	return false
+}
+
 // Owned reports whether a SKILL.md was written by EDwaRd: the current marker,
 // or the name and heading that every earlier build wrote.
 func Owned(b []byte) bool {

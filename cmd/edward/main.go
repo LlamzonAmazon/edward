@@ -87,6 +87,7 @@ func serve() {
 		fmt.Fprintf(os.Stderr, "EDwaRd: load store: %v\n", err)
 		os.Exit(1)
 	}
+	r.RefreshSkills()
 	ln, err := server.Listen(addr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "EDwaRd: cannot bind %s: %v\n", addr, err)

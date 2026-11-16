@@ -4,7 +4,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/LlamzonAmazon/edward/main/install.sh | sh
 #
 # Piped like that, it downloads the latest release and checks its SHA-256.
-# Run from a checkout after `make app`, it installs ./EDwaRd.app instead.
+# Run as a file from a checkout after `make app` (sh install.sh), it
+# installs ./EDwaRd.app instead. Piped, it always downloads.
 #
 #   EDWARD_VERSION=v1.0.0   install that release instead of the latest
 #   EDWARD_TARBALL=path     install a local edward-macos.tar.gz (no download)
@@ -111,7 +112,7 @@ find_bundle() {
 	if [ -n "${EDWARD_BUNDLE:-}" ]; then
 		[ -d "$EDWARD_BUNDLE" ] || die "EDWARD_BUNDLE is not a directory: $EDWARD_BUNDLE"
 		printf '%s\n' "$EDWARD_BUNDLE"
-	elif [ -z "${EDWARD_TARBALL:-}" ] && [ -f ./install.sh ] && [ -d ./EDwaRd.app ]; then
+	elif [ -z "${EDWARD_TARBALL:-}" ] && [ "$(basename -- "$0")" = install.sh ] && [ -f ./install.sh ] && [ -d ./EDwaRd.app ]; then
 		printf '%s\n' "$(pwd)/EDwaRd.app"
 	else
 		fetch_release
