@@ -36,13 +36,18 @@ func CollectConnections(userName string, uid string, procs []Proc) []store.Item 
 // connectionItems turns lsof records into one item per program and address,
 // keeping only this user's sockets.
 func connectionItems(recs []connRec, userName, uid string, uptime map[int]string) []store.Item {
-	seen := map[string]bool{}
-	var items []store.Item
+	var mine []connRec
 	for _, r := range recs {
 		if uid != "" && r.uid != uid && r.uid != userName {
 			continue
 		}
-		dir := direction(r)
+		mine = append(mine, r)
+	}
+	listening := listeningPorts(mine)
+	seen := map[string]bool{}
+	var items []store.Item
+	for _, r := range mine {
+		dir := direction(r, listening)
 		addr := displayAddr(r.name, dir)
 		id := "c-" + r.cmd + "-" + addr
 		if seen[id] {
@@ -104,11 +109,36 @@ func parseLsof(out string) []connRec {
 	return recs
 }
 
-// direction is Outbound for a socket with a remote end, and Listening for a
-// socket bound only locally (a TCP LISTEN, or a UDP socket with no peer).
-func direction(r connRec) string {
+// listeningPorts are the local ports of TCP sockets in LISTEN. A connected
+// socket on one of these ports was accepted from a peer.
+func listeningPorts(recs []connRec) map[string]bool {
+	ports := map[string]bool{}
+	for _, r := range recs {
+		if r.state == "LISTEN" && !strings.Contains(r.name, "->") {
+			ports[port(r.name)] = true
+		}
+	}
+	return ports
+}
+
+func port(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if i := strings.LastIndex(addr, ":"); i >= 0 {
+		return addr[i+1:]
+	}
+	return ""
+}
+
+// direction is Inbound for a connected socket on a listening port, Outbound for
+// any other socket with a remote end, and Listening for a socket bound only
+// locally (a TCP LISTEN, or a UDP socket with no peer).
+func direction(r connRec, listening map[string]bool) string {
 	switch {
 	case strings.Contains(r.name, "->"):
+		local := r.name[:strings.LastIndex(r.name, "->")]
+		if listening[port(local)] {
+			return "Inbound"
+		}
 		return "Outbound"
 	case r.state == "LISTEN", r.state == "", r.state == "Idle", r.state == "CLOSED":
 		return "Listening"
@@ -121,6 +151,17 @@ func displayAddr(name, dir string) string {
 	if dir == "Outbound" {
 		if i := strings.LastIndex(name, "->"); i >= 0 {
 			return strings.TrimSpace(name[i+2:])
+		}
+	}
+	// Inbound shows the peer's host and our port. The peer's port changes on
+	// every connection, so leaving it out keeps one item per peer.
+	if dir == "Inbound" {
+		if i := strings.LastIndex(name, "->"); i >= 0 {
+			peer := strings.TrimSpace(name[i+2:])
+			if j := strings.LastIndex(peer, ":"); j >= 0 {
+				peer = peer[:j]
+			}
+			return peer + " → :" + port(name[:i])
 		}
 	}
 	if dir == "Listening" {

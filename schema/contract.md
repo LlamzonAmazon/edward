@@ -60,9 +60,9 @@ POST `{ "on": false }`: `filesOn: false`. Leave `filesGrant` as `allowed` or `de
 Run as the installing user. No shell. Fixed argument lists. `LANG=C`. Timeouts on every command.
 
 - Processes, every 5s: `/bin/ps` `-axo` `pid=,ppid=,user=,etime=,comm=`. Command line from `/bin/ps` `-axo` `pid=,command=` for the current user only. Redact before store. Item id: `p-{name}-{path}`. Facts: Path, User, Started by, Up for.
-- Connections, every 5s: `/usr/sbin/lsof` `-nP` `-iTCP` `-iUDP` `-FpcunT`. Item id: `c-{name}-{address}`. Facts: Program, Address, Direction (`Listening` or `Outbound`), Open for. Listen address `*` means all interfaces.
+- Connections, every 15s: `/usr/sbin/lsof` `-nP` `-iTCP` `-iUDP` `-FpcunT`. Item id: `c-{name}-{address}`. Facts: Program, Address, Direction (`Listening`, `Inbound` or `Outbound`; `Inbound` is a connected socket on a port this user listens on, shown as `{peer host} → :{port}`), Open for. Listen address `*` means all interfaces.
 - Apps, every 10 min: list `/Applications`, `$HOME/Applications`, Homebrew prefix (`/opt/homebrew/opt` or `/usr/local/opt`). Read each app `Info.plist` with `howett.net/plist`. Signature via `/usr/bin/codesign` `-dv` `--` `{path}` (local only). Item id: `a-{name}`. Facts: Path, Version, From.
-- Startup, every 10 min: `$HOME/Library/LaunchAgents` plists, `osascript` is not required; login items from `$HOME/Library/Application Support/com.apple.backgroundtaskmanagementagent/backgrounditems.btm` if readable, else LaunchAgents only. Item id: `s-{name}`. Facts: Kind, Runs.
+- Startup, every 10 min: `$HOME/Library/LaunchAgents` plists only. macOS 13 and later keep login items in a root-only store, so they are not read. Item id: `s-{name}`. Facts: Kind, Runs.
 - Files, every 60s, only when `filesOn`: list those three directories. Do not walk. Do not hash. Do not read contents. Kind from extension and mode. Item id: `f-{path}`. Facts: Path, Kind, Saved.
 
 Host name: `scutil --get ComputerName` if it runs, else hostname. OS from `sw_vers`. User from the process uid.

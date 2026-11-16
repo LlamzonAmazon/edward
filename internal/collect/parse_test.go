@@ -71,8 +71,8 @@ func TestParseProcesses(t *testing.T) {
 
 func TestParseLsofConnections(t *testing.T) {
 	recs := parseLsof(fixture(t, "lsof.txt"))
-	if len(recs) != 5 {
-		t.Fatalf("want 5 sockets, got %d", len(recs))
+	if len(recs) != 7 {
+		t.Fatalf("want 7 sockets, got %d", len(recs))
 	}
 	items := connectionItems(recs, "alice", "501", map[int]string{610: "1 h"})
 	got := map[string]string{}
@@ -83,6 +83,8 @@ func TestParseLsofConnections(t *testing.T) {
 		"node *:3000":          "Listening",
 		"Slack 34.120.0.1:443": "Outbound",
 		"mDNSResponder *:5353": "Listening",
+		// Two connections accepted on node's port 3000 from one peer are one item.
+		"node 10.0.0.9 → :3000": "Inbound",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("items = %v", got)
