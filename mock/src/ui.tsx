@@ -122,6 +122,13 @@ const paths: Record<IconName | "laptop" | "chevron" | "check" | "copy" | "close"
       <path d="M9.5 9.5l5 5M14.5 9.5l-5 5" />
     </>
   ),
+  target: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+    </>
+  ),
   chevron: <path d="M6 9l6 6 6-6" />,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
   copy: (

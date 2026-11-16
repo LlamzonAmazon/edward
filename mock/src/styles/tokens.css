@@ -24,6 +24,7 @@
   --cyan-500: #00c8ff;
   --purple-500: #7a3cff;
   --magenta-500: #f72fd0;
+  --lime-500: #b6e600;
   --mist-300: #dfe1e6;
   --mist-200: #ebedf0;
   --mist-100: #f5f6f8;
@@ -60,6 +61,7 @@
   --cat-cyan: var(--cyan-500);
   --cat-purple: var(--purple-500);
   --cat-magenta: var(--magenta-500);
+  --cat-lime: var(--lime-500);
   --on-cat: var(--ink-900);
   --on-cat-nav: var(--white);
   /* Type: one family, bold by default */

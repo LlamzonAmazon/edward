@@ -50,6 +50,15 @@ button {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* Link: text that opens another site, such as a catalog report. */
+.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link:hover {
+  color: var(--accent-strong);
+}
 h1,
 h2,
 h3,
@@ -149,6 +158,7 @@ dd {
 [data-cat="cyan"] { --cat: var(--cat-cyan); }
 [data-cat="purple"] { --cat: var(--cat-purple); }
 [data-cat="magenta"] { --cat: var(--cat-magenta); }
+[data-cat="lime"] { --cat: var(--cat-lime); }
 .cat-tile {
   width: var(--cat-tile);
   height: var(--cat-tile);

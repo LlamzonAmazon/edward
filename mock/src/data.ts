@@ -22,15 +22,16 @@ export type IconName =
   | "eyeOff"
   | "fileWarning"
   | "login"
-  | "badgeX";
+  | "badgeX"
+  | "target";
 
-export type CategoryId = "exposed" | "unknownAddress" | "hidden" | "disguised" | "login" | "unsigned";
+export type CategoryId = "exposed" | "unknownAddress" | "hidden" | "disguised" | "login" | "unsigned" | "known";
 
 export type Category = {
   id: CategoryId;
   name: string;
   icon: IconName;
-  color: "red" | "yellow" | "green" | "cyan" | "purple" | "magenta";
+  color: "red" | "yellow" | "green" | "cyan" | "purple" | "magenta" | "lime";
   real: string;
   fine: string;
 };
@@ -83,6 +84,14 @@ export const categories: Record<CategoryId, Category> = {
     color: "green",
     real: "Apple never checked this app, so it can carry anything.",
     fine: "Plenty of small, honest apps skip Apple’s check.",
+  },
+  known: {
+    id: "known",
+    name: "Matches a security report",
+    icon: "target",
+    color: "lime",
+    real: "A public report, linked here, shows attackers using this exact version, behavior, or name.",
+    fine: "An old app version stops matching once you update it. A behavior can also be an honest tool doing something unusual.",
   },
 };
 
@@ -577,6 +586,7 @@ const extras: Extra[] = [
   { source: "startup", item: start("us.zoom.updater", "LaunchAgent", "/Library/Application Support/zoom.us/ZoomUpdater"), category: "login", value: "us.zoom.updater", facts: ["LaunchAgent", "Added 2 weeks ago", "Zoom, signed"], chain: ["~/Library/LaunchAgents", "us.zoom.updater"], quoted: [["Runs", "/Library/Application Support/zoom.us/ZoomUpdater"]] },
   { source: "startup", item: start("com.grammarly.ProjectLlama", "Login item", "/Applications/Grammarly Desktop.app"), category: "login", value: "com.grammarly.ProjectLlama", facts: ["Login item", "Added 4 days ago", "Grammarly, signed"], chain: ["Login items", "com.grammarly.ProjectLlama"], quoted: [["Runs", "/Applications/Grammarly Desktop.app"]] },
   { source: "apps", item: app("ffmpeg", "7.1", "Homebrew, not notarized"), category: "unsigned", value: "ffmpeg", facts: ["Version 7.1", "Homebrew", "Installed 2 weeks ago"], chain: ["Homebrew", "ffmpeg"], quoted: [["Path", "/opt/homebrew/bin/ffmpeg"]] },
+  { source: "apps", item: app("Google Chrome", "130.0", "Google, notarized"), category: "known", value: "Google Chrome 130.0", facts: ["14 bugs attackers are known to use", "Fixed in 157.0.8103.50", "CVE-2026-125350: Google Chromium Use-After-Free Vulnerability", "CVE-2026-87491: Google Chromium V8 Out of Bounds Write Vulnerability", "CVE-2026-85046: Google Chromium V8 Type Confusion Vulnerability", "and 11 more"], chain: ["Google Chrome"], quoted: [["Path", "/Applications/Google Chrome.app"], ["Report", "https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search=CVE-2026-125350"], ["Report", "https://nvd.nist.gov/vuln/detail/CVE-2026-125350"], ["Technique", "T1203"]] },
   { source: "apps", item: app("Keka", "1.4.5", "Download, not notarized"), category: "unsigned", value: "Keka", facts: ["Version 1.4.5", "Installed 1 month ago", "From keka-1.4.5.dmg"], chain: ["Downloads", "keka-1.4.5.dmg", "Keka"], quoted: [["App", "/Applications/Keka.app"]] },
 ];
 

@@ -34,6 +34,19 @@ export function FindingView(props: Props) {
   );
 }
 
+// reportName labels a catalog report link by its site and page, so the link
+// says where it goes: "nvd.nist.gov: CVE-2025-6554".
+function reportName(url: string) {
+  try {
+    const u = new URL(url);
+    const search = u.searchParams.get("search");
+    const last = u.pathname.split("/").filter(Boolean).pop();
+    return `${u.hostname.replace(/^www\./, "")}: ${search ?? last ?? ""}`;
+  } catch {
+    return url;
+  }
+}
+
 function isPathLike(label: string, value: string) {
   return label === "Command" || value.startsWith("~") || value.startsWith("/");
 }
@@ -155,16 +168,25 @@ function Detail({ finding, st, agentNames, onClear, onAsk, onNote }: Props) {
               </ol>
             </div>
             <dl className="details">
-              {finding.quoted.map(([k, v]) =>
-                isPathLike(k, v) ? (
-                  <div key={k} className="copy-row">
+              {finding.quoted.map(([k, v], i) =>
+                k === "Report" && v.startsWith("https://") ? (
+                  <div key={i}>
+                    <dt>{k}</dt>
+                    <dd>
+                      <a className="link" href={v} target="_blank" rel="noreferrer">
+                        {reportName(v)}
+                      </a>
+                    </dd>
+                  </div>
+                ) : isPathLike(k, v) ? (
+                  <div key={i} className="copy-row">
                     <dt>{k}</dt>
                     <dd>
                       <CopyButton text={v} tone="quiet" size="s" label={`Copy ${k.toLowerCase()}`} />
                     </dd>
                   </div>
                 ) : (
-                  <div key={k}>
+                  <div key={i}>
                     <dt>{k}</dt>
                     <dd>{v}</dd>
                   </div>
