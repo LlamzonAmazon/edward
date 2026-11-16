@@ -136,8 +136,8 @@ The threat model and how to report a vulnerability are in [SECURITY.md](SECURITY
 | Action | What happens | How |
 | --- | --- | --- |
 | Pause | Collection stops. The program keeps running and the page still works. | Settings → Pause looking, or Looking / Paused in the sidebar |
-| Turn off | The program quits and no longer starts at login. Your store and skill files stay. Run the install command to start it again. | Settings → Turn off EDwaRd |
-| Uninstall | Removes the program, the LaunchAgent, the store, the logs, the `edward` link and EDwaRd's skill files | Settings → Delete EDwaRd from this Mac, or `edward uninstall` |
+| Turn off | The program quits and no longer starts at login. Your store and skill files stay. Run the install command to start it again. | Settings → Turn off, then Confirm |
+| Uninstall | Removes the program, the LaunchAgent, the store, the logs, the `edward` link and EDwaRd's skill files | Settings → Delete, then Confirm, or `edward uninstall` |
 
 Your agent offers the same three options when you ask it to stop EDwaRd.
 
