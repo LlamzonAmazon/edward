@@ -28,6 +28,8 @@ Usage: edward <command>
 
   status     Show whether EDwaRd is running, and where its files are
   open       Open the page (` + pageURL + `)
+  clear      Clear the findings whose values are given on stdin, one per line
+             (--undo raises them again)
   uninstall  Remove EDwaRd from this Mac: program, login item, store, logs, skills
   version    Print the version
   serve      Run the collector and page (the login item runs this)
@@ -52,6 +54,8 @@ func main() {
 			fmt.Fprintln(os.Stderr, "EDwaRd: could not open "+pageURL)
 			os.Exit(1)
 		}
+	case "clear":
+		os.Exit(clearFindings(os.Args[2:]))
 	case "uninstall":
 		lines, err := lifecycle.UninstallNow(collect.DataDir())
 		for _, l := range lines {

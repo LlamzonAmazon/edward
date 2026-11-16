@@ -84,6 +84,7 @@ EDwaRd writes only these files, marks them `edward-managed`, and never overwrite
 ```bash
 edward status      # running or not, and where its files are
 edward open        # open the page
+edward clear       # clear the findings named on stdin, one value per line (--undo raises them again)
 edward version     # print the version
 edward uninstall   # remove everything EDwaRd installed
 ```
@@ -210,7 +211,7 @@ make release      # universal tarball and SHA256SUMS in dist/
 
 | Path | Contents |
 | --- | --- |
-| `cmd/edward` | CLI: `serve`, `status`, `open`, `uninstall`, `version` |
+| `cmd/edward` | CLI: `serve`, `status`, `open`, `clear`, `uninstall`, `version` |
 | `internal/collect` | Collectors, the snapshot loop and UDP trust checks |
 | `internal/playbook` | The seven rules |
 | `internal/catalog` | Catalog entries, matching, and the KEV and NVD draft tool |
